@@ -20,7 +20,7 @@ for (const __v of __variants){
     .select('chapter_index,page_number')
     .eq('user_id', uid)
     .eq('book_id', __v)
-    .maybeSingle();
+    maybeSingle();
   if (!error){ progress = data; break; }
   console.warn('[InkWell] progress fetch failed for variant %o:', __v, error);
 }
