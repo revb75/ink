@@ -60,6 +60,18 @@ html, body {
 .edge-shield.right { right: 0; }
 
 #quiet-btn.active { background: rgba(0,0,0,.08); }
+
+/* === OVERRIDE: Remove non-working under-toolbar CTA bar === */
+#next-cta-bar, #next-cta-bar * { display: none !important; }
+
+
+/* === OVERRIDE: Move FAB to top-right below toolbar (safe-area aware) === */
+#inkwell-next-fab {
+  top: calc(var(--toolbar-h, 48px) + env(safe-area-inset-top, 0px) + 8px) !important;
+  right: calc(env(safe-area-inset-right, 0px) + 12px) !important;
+  left: auto !important;
+}
+
 </style>
 <meta charset="utf-8"/>
 <title>InkWell EPUB Reader</title>
@@ -67,6 +79,446 @@ html, body {
 <!-- fonts -->
 <link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;600&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@300..700" rel="stylesheet"/>
+<style>
+    * { box-sizing: border-box; margin:0; padding:0; }
+    body { background:#fafafa; color:#333; font-family:'Lora',serif; line-height:1.65; }
+
+    .material-symbols-outlined {
+      font-family:'Material Symbols Outlined';
+      font-variation-settings:'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      font-size:24px; color:#555;
+      display:inline-flex; align-items:center; justify-content:center;
+    }
+
+    /* Login */
+    #login-screen { position:fixed; inset:0; background:#fff; display:none; align -items:center; justify-content:center; z-index:300; }
+    #login-screen.active { display:flex; }
+    #login-form { display:flex; flex-direction:column; gap:1rem; padding:2rem; border:1px solid #ddd; border-radius:8px; background:#f9f9f9; box-shadow:0 2px 8px rgba(0,0,0,.1); }
+    #login-form input { padding:.5rem; border:1px solid #888; border-radius:4px; }
+    #login-form button { padding:.75rem; background:#0066cc; color:#fff; border:none; border-radius:4px; cursor:pointer; }
+
+    /* Toolbar */
+    #toolbar {
+      height:50px; background:#ededed; border-bottom:1px solid #ccc;
+      display:flex; justify-content:space-between; align-items:center;
+      padding:0 14px; user-select:none;
+    }
+    .group { display:flex; gap:14px; align-items:center; }
+    .btn {
+      width:40px; height:40px; border:none; background:none; cursor:pointer;
+      display:flex; align-items:center; justify-content:center; border-radius:8px;
+      transition:background .18s;
+    }
+    .btn:hover { background:rgba(0,0,0,.06); }
+    .btn.active .material-symbols-outlined { color:#c00; }
+    #status-dot { width:10px; height:10px; border-radius:50%; background:#d40000; }
+    #page-indicator { font-size:.9rem; color:#333; padding:0 8px; }
+
+    /* Emotion bar / layout vars */
+    :root {
+      --emotion-bar-height:16px;
+      --emotion-extra-gap:20px;
+      --safe-bottom:env(safe-area-inset-bottom,0px);
+      --reader-bottom-pad:calc(var(--emotion-bar-height) + var(--emotion-extra-gap) + var(--safe-bottom));
+      --reader-font-size:18px;
+    
+  --toolbar-h: calc(50px + env(safe-area-inset-top, 0px));
+}
+
+    /* Reader (base horizontal / paginated defaults) */
+    #reader {
+      height:calc(100dvh - 64px);
+      overflow-x:scroll; overflow-y:hidden;
+      scroll-behavior:smooth;
+      padding:20px 16px 20px 16px;
+      text-align:justify; column-gap:2rem;
+      font-size:var(--reader-font-size);
+    }
+    #reader::-webkit-scrollbar { display:none; }
+    #reader { -ms-overflow-style:none; scrollbar-width:none; }
+    .chapter-wrapper {
+      break-before:column; -webkit-column-break-before:always;
+      break-inside:avoid; margin-bottom:2rem;
+    }
+
+    /* Emotion heatmap bar (original gradient 8 zones) */
+    #emotional-heatmap {
+      position:fixed;
+      inset-inline:0;
+      bottom:0;
+      height:var(--emotion-bar-height);
+      background:linear-gradient(
+        to right,
+        #3b83bd,
+        #5c6bc0,
+        #ffeb3b,
+        #fbc02d,
+        #ec407a,
+        #f44336,
+        #e91e63,
+        #81c784
+      );
+      z-index:20;
+      user-select:none;
+      overflow:hidden;
+    }
+    .emotion-zone {
+      position:absolute;
+      top:0;
+      height:100%;
+      width:12.5%;
+      cursor:pointer;
+    }
+    .emotion-zone:hover { filter:brightness(1.15); }
+    body.highlight-mode .emotion-zone { pointer-events:none; opacity:.35; }
+
+    #emotion-popup {
+      display:none; position:fixed; bottom:calc(var(--emotion-bar-height) + 8px + var(--safe-bottom)); left:50%;
+      transform:translateX(-50%); background:#222; color:#fff;
+      padding:12px 16px; border-radius:10px; box-shadow:0 4px 16px rgba(0,0,0,.4);
+      z-index:1000; font-size:14px; text-align:center;
+    }
+    #emotion-popup button { margin-top:6px; margin-inline:6px; }
+
+    body.paginated-mode:not(.highlight-mode) {
+      overflow:hidden; position:fixed; width:100%;
+    }
+    body.paginated-mode #reader {
+      overscroll-behavior:none;
+      touch-action:pan-y pinch-zoom;
+    }
+
+    /* Vertical mode (updated) */
+    body.vertical-mode {
+      overflow:auto;
+      position:static;
+    }
+    body.vertical-mode #reader {
+      height:auto;
+      max-height:none;
+      overflow-y:auto;
+      overflow-x:hidden;
+      column-gap:0;
+      column-width:auto !important;
+      white-space:normal;
+      padding-bottom:calc(var(--emotion-bar-height) + var(--emotion-extra-gap) + var(--safe-bottom) + 40px);
+      scroll-behavior:auto;
+    }
+    body.vertical-mode #reader .chapter-wrapper {
+      break-before:auto;
+      -webkit-column-break-before:auto;
+    }
+
+    /* Highlights */
+    .user-highlight,
+    .highlighted {
+      background:#cce5ff;
+      cursor:pointer;
+      transition:background .2s;
+    }
+
+/* === Dark theme: make highlights readable on black background === */
+body.theme-dark #reader .user-highlight,
+body.theme-dark #reader .highlighted {
+  background: #ffffff !important;
+  color: #000000 !important;
+  /* slight inset outline for crisp edges on OLED blacks */
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.55) inset;
+}
+body.theme-dark #reader .user-highlight:active,
+body.theme-dark #reader .highlighted:active {
+  background: #f2f2f2 !important;
+}
+
+/* Also invert live text selection inside the reader in dark mode */
+body.theme-dark #reader ::selection {
+  background: #ffffff;
+  color: #000000;
+}
+
+
+    .user-highlight:active { background:#b5d9ff; }
+
+    /* Highlight note modal */
+    #highlight-note-modal {
+      display:none; position:fixed; inset:0; z-index:1100;
+      background:rgba(0,0,0,.35); backdrop-filter:blur(3px);
+    }
+    #highlight-note-modal .modal-card {
+      position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+      background:#fff; width:min(92vw,560px); max-height:80vh;
+      padding:20px 22px 18px; border-radius:18px;
+      box-shadow:0 8px 30px -4px rgba(0,0,0,.35);
+      display:flex; flex-direction:column; gap:14px;
+      font-family:Lora,serif;
+    }
+    #highlight-note-modal h3 { margin:0; font-size:1.05rem; font-weight:600; letter-spacing:.5px; }
+    #highlighted-passage {
+      background:#f3f7fb; border:1px solid #d2dbe3; padding:10px 12px; border-radius:10px;
+      font:400 .95rem/1.4 Lora,serif; max-height:140px; overflow:auto; white-space:pre-wrap;
+    }
+    #highlight-note-text {
+      width:100%; flex:1; min-height:120px; font:400 1rem/1.45 Lora,serif;
+      padding:10px 12px; border:1px solid #bbb; border-radius:10px; resize:vertical;
+      background:#fafafa;
+    }
+    #highlight-note-actions { display:flex; gap:10px; flex-wrap:wrap; }
+    #highlight-note-actions button {
+      flex:1 1 auto; padding:10px 14px; border:none; border-radius:10px; cursor:pointer;
+      font:500 .9rem/1 Lora,serif; letter-spacing:.4px;
+    }
+    .btn-secondary { background:#999; color:#fff; }
+    .btn-primary { background:#0066cc; color:#fff; }
+    .btn-danger { background:#d43838; color:#fff; flex:0 0 auto; }
+
+    @media (max-width:480px) {
+      #highlight-note-modal .modal-card { padding:18px 16px 16px; }
+      #highlight-note-text { min-height:100px; }
+      #highlighted-passage { max-height:110px; }
+    }
+
+    /* Font Panel */
+    #font-panel {
+      position:fixed;
+      top:60px;
+      right:12px;
+      width:300px;
+      max-width:90vw;
+      background:#ffffffee;
+      backdrop-filter:blur(10px);
+      border:1px solid #cfcfcf;
+      border-radius:14px;
+      padding:14px 16px 16px;
+      z-index:400;
+      font-family:system-ui,-apple-system,Segoe UI,Inter,sans-serif;
+      display:none;
+      box-shadow:0 8px 28px -6px rgba(0,0,0,0.35);
+    }
+    #font-panel.active { display:block; }
+    #font-panel h4 {
+      margin:0 0 10px;
+      font:600 14px/1.2 Inter,system-ui,sans-serif;
+      letter-spacing:.5px;
+      text-transform:uppercase;
+      opacity:.75;
+    }
+    #font-panel label { display:flex; flex-direction:column; gap:6px; font-size:13px; margin-bottom:12px; }
+    #font-panel select,
+    #font-panel input[type=range] { width:100%; }
+    .theme-row { display:flex; gap:8px; }
+    .theme-swatch {
+      flex:1;
+      height:34px;
+      border-radius:10px;
+      border:1px solid #aaa;
+      cursor:pointer;
+      position:relative;
+      font-size:0;
+    }
+    .theme-swatch.active::after {
+      content:"";
+      position:absolute;
+      inset:4px;
+      border:2px solid #0066cc;
+      border-radius:6px;
+      pointer-events:none;
+    }
+    .theme-swatch[data-theme=light] { background:#fff; }
+    .theme-swatch[data-theme=dark] { background:#1e1f20; }
+    .theme-swatch[data-theme=sepia] { background:#f5e3c5; }
+    .theme-swatch[data-theme=matcha] { background:#e3f3dd; }
+    #font-size-display {
+      font:600 13px/1 Inter,system-ui,sans-serif;
+      min-width:2ch;
+      text-align:right;
+    }
+    #close-font-panel {
+      position:absolute;
+      top:6px;
+      right:6px;
+      width:28px; height:28px;
+      background:transparent;
+      border:none;
+      border-radius:8px;
+      cursor:pointer;
+      font-size:18px;
+      line-height:1;
+    }
+    #close-font-panel:hover { background:rgba(0,0,0,.07); }
+
+    /* Themes */
+    body.theme-dark { background:#121314; color:#e4e4e4; }
+    body.theme-sepia { background:#f4ecd8; color:#4b3a22; }
+    body.theme-matcha { background:#F2F8EE; color:#1e3123; }
+    body.theme-dark #toolbar { background:#1d1f21; border-color:#2a2d2f; }
+    body.theme-sepia #toolbar { background:#eadbc2; }
+    body.theme-matcha #toolbar { background:#e1ecdc; }
+
+    /* TOC Panel */
+    #toc-panel {
+      position:fixed;
+      top:60px;
+      left:12px;
+      width:300px;
+      max-width:85vw;
+      max-height:calc(100dvh - 90px);
+      display:none;
+      flex-direction:column;
+      background:#ffffffee;
+      backdrop-filter:blur(10px);
+      border:1px solid #cfcfcf;
+      border-radius:14px;
+      padding:14px 14px 16px;
+      z-index:450;
+      font-family:system-ui,-apple-system,Segoe UI,Inter,sans-serif;
+      box-shadow:0 10px 34px -8px rgba(0,0,0,.35);
+      overflow:auto;
+    }
+    #toc-panel.active { display:flex; }
+    #toc-panel .toc-header {
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+      margin-bottom:10px;
+    }
+    #toc-panel h4 {
+      margin:0;
+      font:600 14px/1.2 Inter,system-ui,sans-serif;
+      letter-spacing:.5px;
+      text-transform:uppercase;
+      opacity:.75;
+    }
+    #toc-close {
+      background:transparent;
+      border:none;
+      width:32px; height:32px;
+      font-size:20px;
+      border-radius:8px;
+      cursor:pointer;
+    }
+    #toc-close:hover { background:rgba(0,0,0,.07); }
+    #toc-list {
+      list-style:decimal;
+      margin:0;
+      padding:0 0 0 20px;
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      font:500 13px/1.3 Inter,system-ui,sans-serif;
+    }
+    #toc-list li {
+      cursor:pointer;
+      padding:4px 6px;
+      border-radius:6px;
+      transition:background .15s;
+      word-break:break-word;
+    }
+    #toc-list li:hover { background:rgba(0,0,0,.07); }
+    #toc-list li.current {
+      background:#0066cc;
+      color:#fff;
+    }
+    body.theme-dark #toc-panel { background:#1d1f21ee; border-color:#2a2d30; }
+    body.theme-dark #toc-list li:hover { background:#2b3136; }
+    body.theme-dark #toc-list li.current { background:#1f73c9; }
+    body.theme-sepia #toc-panel { background:#eadbc2ee; }
+    body.theme-matcha #toc-panel { background:#e1ecdcdd; }
+
+    
+  
+/* Ensure bottom padding accounts for emotion bar */
+#reader { padding-bottom: calc(var(--emotion-bar-height) + var(--emotion-extra-gap) + var(--safe-bottom)); }
+
+/* Activate only when JS adds .vh-polyfill to <html> */
+.vh-polyfill #reader {
+  min-height: calc(var(--vh, 1vh) * 100 - var(--toolbar-h)) !important;
+}
+
+
+/* Floating '' button: safe-area aware, never overlaps toolbar */
+#next-chapter-btn {
+  position: fixed;
+  right: 12px;
+  bottom: calc(var(--toolbar-h) + env(safe-area-inset-bottom, 0px) + 12px);
+  z-index: 2500;
+  padding: 12px 16px;
+  border-radius: 9999px;
+  border: none;
+  background: #1e73ff;
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 6px 18px rgba(0,0,0,.2);
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+  transition: opacity .22s ease, transform .22s ease;
+}
+#next-chapter-btn.show {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+#next-chapter-btn:active { transform: translateY(1px); }
+
+
+/* (disabled) Force bottom-right; neutralize any inherited 'top' */
+#next-chapter-btn {
+  top: auto !important;
+  bottom: calc(var(--toolbar-h) + env(safe-area-inset-bottom, 0px) + 12px) !important;
+  right: 12px !important;
+  left: auto !important;
+}
+/* Nuke any legacy top-right Next buttons that might linger */
+button[aria-label*="" i]:not(#next-chapter-btn),
+a[aria-label*="" i],
+button[class*="next"][class*="chapter"]:not(#next-chapter-btn),
+a[class*="next"][class*="chapter"] {
+  display: none !important;
+  pointer-events: none !important;
+}
+
+
+@media (hover:hover) {
+  #next-chapter-btn:hover { filter: brightness(1.05); }
+}
+
+
+/* Professional, minimal pill button — safe-area aware, above toolbar */
+#next-chapter-btn {
+  position: fixed;
+  inset: auto 14px calc(var(--toolbar-h) + env(safe-area-inset-bottom, 0px) + 14px) auto;
+  z-index: 2500;
+  padding: 12px 16px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(20,20,20,0.72);
+  color: #fff;
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 1;
+  letter-spacing: .2px;
+  box-shadow: 0 10px 24px rgba(0,0,0,.28);
+  -webkit-tap-highlight-color: transparent;
+  backdrop-filter: saturate(120%) blur(4px);
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+  transition: opacity .18s ease, transform .18s ease;
+}
+#next-chapter-btn.show {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+#next-chapter-btn:active { transform: translateY(1px); }
+@media (hover:hover) {
+  #next-chapter-btn:hover { filter: brightness(1.06); }
+}
+#next-chapter-btn:focus-visible {
+  outline: 2px solid rgba(255,255,255,0.6);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(255,255,255,0.25), 0 10px 24px rgba(0,0,0,.28);
+}
+
+</style>
 <style id="inkwell-css-override">
   .chapter, .page {
     margin: 0 !important;
@@ -1793,6 +2245,7 @@ document.addEventListener('error', function (e) {
   });
 })();
 </script>
+
 <!-- Floating Next Chapter Button (appears near end, vertical mode only) -->
 <script>
 (function(){
@@ -1821,26 +2274,26 @@ document.addEventListener('error', function (e) {
 
   // Basic pill styling
   const style = doc.createElement('style');
-  style.textContent = `
-    #inkwell-next-fab {
-      position: fixed;
-      right: 16px;
-      bottom: 16px;
-      z-index: 10000;
-      display: none;
-      padding: 10px 18px;
-      border-radius: 999px;
-      border: 1px solid rgba(0,0,0,.15);
-      background: #111;
-      color: #fff;
-      font: 600 15px/1 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-      box-shadow: 0 6px 18px rgba(0,0,0,.25);
-      -webkit-tap-highlight-color: transparent;
-      user-select: none;
-    }
-    #inkwell-next-fab.show { display: inline-flex; align-items:center; justify-content:center; }
-    #inkwell-next-fab:active { transform: translateY(1px); }
-  `;
+  style.textContent = `#inkwell-next-fab {
+  position: fixed;
+  top: calc(var(--toolbar-h, 48px) + env(safe-area-inset-top, 0px) + 8px);
+  right: calc(env(safe-area-inset-right, 0px) + 12px);
+  left: auto;
+  bottom: auto;
+  z-index: 10000;
+  display: none;
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(0,0,0,.15);
+  background: #111;
+  color: #fff;
+  font: 600 15px/1 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  box-shadow: 0 6px 18px rgba(0,0,0,.25);
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+#inkwell-next-fab.show { display: inline-flex; align-items:center; justify-content:center; }
+#inkwell-next-fab:active { transform: translateY(1px); }`;
   doc.head.appendChild(style);
 
   const showFab = () => fab.classList.add('show');
@@ -1873,46 +2326,31 @@ document.addEventListener('error', function (e) {
   window.InkWellNextFab = { show: showFab, hide: hideFab, rearm: onScroll };
 })();
 </script>
-<button aria-label="Next" id="next-10pct-btn" type="button">Next</button><script>
-(function Last10PctNext(){
-  const ID = "next-10pct-btn";
-  const btn = document.getElementById(ID);
-  if (!btn) return;
+<script>
+(function nextToolbarWire(){
+  const log = (...a) => console.log("[NextToolbar]", ...a);
 
-  // --- helpers ---
-  function isVertical(){ 
-    try { if (window.ReaderState && typeof window.ReaderState.getMode === 'function') return window.ReaderState.getMode() === 'vertical'; } catch {}
+  // Resolve vertical mode similarly to your app's logic
+  function isVertical(){
+    try {
+      if (window.ReaderState && typeof window.ReaderState.getMode === 'function') {
+        return window.ReaderState.getMode() === 'vertical';
+      }
+    } catch {}
     const p = new URLSearchParams(location.search).get('vert');
     if (p === 'true') return true;
     if (p === 'false') return false;
     return (localStorage.getItem('InkWell:isVertical') === 'true');
   }
-  function scrollRoot(){ return document.scrollingElement || document.documentElement; }
-  function progress(){ 
-    const sc = scrollRoot();
-    const d = sc.scrollHeight - sc.clientHeight;
-    if (d <= 0) return 1;
-    return Math.max(0, Math.min(1, sc.scrollTop / d));
-  }
-  function throttle(fn, ms){
-    let t = 0, raf = null, lastArgs = null;
-    return function(){ 
-      lastArgs = arguments;
-      const now = Date.now();
-      if (now - t >= ms){
-        t = now; fn.apply(this, lastArgs);
-      } else if (!raf) {
-        raf = requestAnimationFrame(() => { raf = null; t = Date.now(); fn.apply(this, lastArgs); });
-      }
-    };
-  }
-  function tryRightTap(){ 
-    const right = document.querySelector('.edge-shield.right, #rightTapZone, [data-role="tap-right"]');
-    if (right) { try { right.click(); return true; } catch(e){} }
+
+  function forwardViaTapZone(){
+    const rightTap = document.querySelector('.edge-shield.right, #rightTapZone, [data-role="tap-right"]');
+    if (rightTap) {
+      try { rightTap.click(); return true; } catch(e){}
+    }
     return false;
   }
-  function advance(){ 
-    if (tryRightTap()) return;
+  function forwardFallback(){
     if (typeof window.nextPage === 'function') return window.nextPage();
     if (typeof window.pageForward === 'function') return window.pageForward();
     if (typeof window.advancePage === 'function') return window.advancePage();
@@ -1920,31 +2358,31 @@ document.addEventListener('error', function (e) {
     if (typeof window.next === 'function') return window.next();
     if (typeof window.nextChapter === 'function') return window.nextChapter();
     if (typeof window.goToNextChapter === 'function') return window.goToNextChapter();
-    if (typeof window.loadChapter === 'function') { 
-      const idx = (window.currentChapterIndex ?? window.chap ?? 0) + 1; 
-      return window.loadChapter(idx, 'start'); 
+    if (typeof window.loadChapter === 'function') {
+      const idx = (window.currentChapterIndex ?? window.chap ?? 0) + 1;
+      return window.loadChapter(idx, 'start');
     }
+    document.dispatchEvent(new CustomEvent('inkwell:next', { bubbles: true }));
     document.dispatchEvent(new CustomEvent('inkwell:next-chapter', { bubbles: true }));
+    log("Dispatched inkwell:next (+ next-chapter) – no known function found.");
+  }
+  function goForward(){
+    if (!forwardViaTapZone()) forwardFallback();
   }
 
-  // --- show/hide logic ---
-  function update(){
-    if (!isVertical()) { btn.style.display = 'none'; return; }
-    const pct = progress();
-    if (pct >= 0.90) btn.style.display = 'inline-flex';
-    else btn.style.display = 'none';
+  function applyMode(){
+    const v = isVertical();
+    if (v) document.body.classList.add('vertical-mode'); else document.body.classList.remove('vertical-mode');
+    const btn = }
+
+  if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', applyMode, { once:true });
+  } else {
+    applyMode();
   }
-  const onScroll = throttle(update, 100);
-  window.addEventListener('scroll', onScroll, { passive: true });
-  window.addEventListener('resize', onScroll);
-  document.addEventListener('chapter:changed', () => setTimeout(update, 50));
-  document.addEventListener('reader:ready', () => setTimeout(update, 0));
 
-  btn.addEventListener('click', advance);
-
-  // initial
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', update, { once:true });
-  else update();
+  // Re-arm after chapter changes if your app fires this event
+  document.addEventListener('chapter:changed', applyMode);
 })();
 </script></body>
 <script>
@@ -2032,25 +2470,64 @@ document.addEventListener('error', function (e) {
 }
 </style>
 <style>
+/* --- Floating Next Chapter button (FAB) --- */
+  \1bottom: auto;\2
+    z-index: 10000;
+    display: none;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 14px;
+    border-radius: 9999px;
+    background: rgba(20,20,20,.92);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,.12);
+    box-shadow: 0 6px 20px rgba(0,0,0,.25);
+    font: 500 14px/1 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+  #inkwell-next-fab.show { display: inline-flex; }
+  #inkwell-next-fab .icon { font-size: 16px; }
+  #inkwell-next-fab .dismiss {
+    font-size: 16px;
+    opacity: .8;
+    padding: 0 2px;
+  }
+  #inkwell-next-fab:active { transform: translateY(1px); }
+</style>
+<style>
 /* Disable side tap zones in vertical mode so clicks aren't intercepted */
 body.vertical-mode .edge-shield { display: none !important; pointer-events: none !important; }
 </style><style>
-/* Floating 'Next' pill shown only in last 10% of chapter (vertical mode) */
-#next-10pct-btn {
-  position: fixed;
-  right: 16px;
-  bottom: 16px;
-  padding: 10px 18px;
-  border-radius: 999px;
+/* Next CTA bar directly below toolbar */
+#next-cta-bar {
+  position: sticky;
+  top: 48px;                 /* adjust if your toolbar is taller */
+  z-index: 19;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 12px;
+  backdrop-filter: blur(6px);
+  background: rgba(17,24,39,.6);
+  border-bottom: 1px solid #1f2937;
+}
+/* Professional pill button */
+#next-toolbar-btn {
+  appearance: none;
   border: 0;
-  background: #2563eb;
-  color: #fff;
+  border-radius: 999px;
+  padding: 8px 16px;
   font-weight: 600;
   font-size: 14px;
-  box-shadow: 0 10px 20px rgba(0,0,0,.25);
+  color: #fff;
+  background: #2563eb;
+  box-shadow: 0 8px 18px rgba(0,0,0,.25);
   cursor: pointer;
-  display: none;           /* hidden by default */
-  z-index: 10000;
 }
-#next-10pct-btn:hover { background: #1e40af; }
+#next-toolbar-btn:hover { background:#1e40af; }
+/* Only show CTA bar in vertical mode */
+body:not(.vertical-mode) #next-cta-bar { display: none; }
+/* Disable side tap zones in vertical mode so they don't steal clicks */
+body.vertical-mode .edge-shield { display: none !important; pointer-events: none !important; }
 </style></head></html>
