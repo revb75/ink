@@ -4,33 +4,8 @@
 <head>
   <!-- INKWELL-BUILD: reader.fixed  -->
   
-<script type="module">
-import { supabase } from './js/supabase.js';
-import { withUser } from './js/auth.js';
+<script>// trimmed broken module block — replaced by patch</script>
 
-withUser(async (uid) => {
-  const params = new URLSearchParams(location.search);
-  const bookId = params.get('book_id') || params.get('book');
-  if (!bookId) return;
-
-  const { data: progress } = await supabase
-    .from('reading_progress')
-    .select('chapter_index,page_number')
-    .eq('user_id', uid)
-    .eq('book_id', bookId)
-    .maybeSingle();
-
-  if (typeof initReader === 'function') {
-    initReader(progress || { chapter_index: 0, page_number: 0 });
-  } else {
-    console.error('[Reader] initReader not found.');
-  }
-});
-
-// Inline Supabase bootstrap (no external /js/supabase.js needed)
-(function(){
-  const SUPABASE_URL = window.INKWELL_SUPABASE_URL || 'https://hrxkqvifqawrnpzokome.supabase.co';
-  const SUPABASE_ANON_KEY = window.INKWELL_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhyeGtxdmlmcWF3cm5wem9rb21lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcxNzQ0MDIsImV4cCI6MjA2Mjc1MDQwMn0.UZVhGweJEQBxqtrp37G77YmAefQWZYDGzdk1lyj4ua4';
 
   <script src="/js/reader-state.js"></script>
 <style>
@@ -1143,7 +1118,7 @@ if (error && error.code !== '409') console.error('Save progress failed', error);
         .select('chapter_index,page_number')
         .eq('user_id',userId)
         .eq('book_id',bookId)
-        .maybeSingle();
+
       const startChap = saved?.chapter_index ?? 0;
       const startPage = saved?.page_number ?? 0;
 
@@ -2547,6 +2522,7 @@ document.addEventListener('error', function (e) {
     };
   })();
   </script>
+<button id="next-chapter-btn" type="button" aria-label="Next">Next</button>
 </body>
 
 <script>
