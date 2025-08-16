@@ -2,11 +2,10 @@
 
 <html lang="en">
 <head>
-  <!-- INKWELL-BUILD: reader.fixed  -->
-  
+<!-- INKWELL-BUILD: reader.fixed  -->
 <script type="module">
-import { supabase } from 'js/supabase.js';
-import { withUser } from 'js/auth.js';
+import { supabase } from './js/supabase.js';
+import { withUser } from './js/auth.js';
 
 withUser(async (uid) => {
   const params = new URLSearchParams(location.search);
@@ -20,23 +19,14 @@ withUser(async (uid) => {
     .eq('book_id', bookId)
     .maybeSingle();
 
-  if (typeof initReader === 'function') {
-    initReader(progress || { chapter_index: 0, page_number: 0 });
+  if (!window.__INKWELL_INIT_CALLED && typeof initReader === 'function') { window.__INKWELL_INIT_CALLED = true; initReader(progress || { chapter_index: 0, page_number: 0 });
   } else {
     console.error('[Reader] initReader not found.');
   }
 });
 
-// Inline Supabase bootstrap (no external /js/supabase.js needed)
-(function(){
-  const SUPABASE_URL = window.INKWELL_SUPABASE_URL || 'https://hrxkqvifqawrnpzokome.supabase.co';
-  const SUPABASE_ANON_KEY = window.INKWELL_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhyeGtxdmlmcWF3cm5wem9rb21lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcxNzQ0MDIsImV4cCI6MjA2Mjc1MDQwMn0.UZVhGweJEQBxqtrp37G77YmAefQWZYDGzdk1lyj4ua4';
-  
-
 </script>
-
-
-  <script src="/js/reader-state.js"></script>
+<script src="/js/reader-state.js"></script>
 <style>
   #toolbar {
     position: fixed !important;
@@ -69,6 +59,18 @@ html, body {
 .edge-shield.right { right: 0; }
 
 #quiet-btn.active { background: rgba(0,0,0,.08); }
+
+/* === OVERRIDE: Remove non-working under-toolbar CTA bar === */
+#next-cta-bar, #next-cta-bar * { display: none !important; }
+
+
+/* === OVERRIDE: Move FAB to top-right below toolbar (safe-area aware) === */
+#inkwell-next-fab {
+  top: calc(var(--toolbar-h, 48px) + env(safe-area-inset-top, 0px) + 8px) !important;
+  right: calc(env(safe-area-inset-right, 0px) + 12px) !important;
+  left: auto !important;
+}
+
 </style>
 <meta charset="utf-8"/>
 <title>InkWell EPUB Reader</title>
@@ -456,7 +458,7 @@ body.theme-dark #reader ::selection {
 #next-chapter-btn:active { transform: translateY(1px); }
 
 
-/* Force our button to bottom-right; neutralize any inherited 'top' */
+/* (disabled) Force bottom-right; neutralize any inherited 'top' */
 #next-chapter-btn {
   top: auto !important;
   bottom: calc(var(--toolbar-h) + env(safe-area-inset-bottom, 0px) + 12px) !important;
@@ -569,8 +571,6 @@ a[class*="next"][class*="chapter"] {
 }
 @media (max-width:420px){ #page-indicator{ font-size:.72rem; } }
 </style>
-
-
 <script type="module">
 </script>
 <div id="toolbar" style="width:100%; display:flex; justify-content:space-between; align-items:center; padding: 0 8px; box-sizing:border-box;">
@@ -585,8 +585,8 @@ a[class*="next"][class*="chapter"] {
 </div>
 <div class="group" id="toolbar-center" style="display:flex; justify-content:center; flex:1;">
 <button class="btn" id="quiet-btn" title="Quiet mode (brown noise)">
-  <span class="material-symbols-outlined">spa</span>
-</div>
+<span class="material-symbols-outlined">spa</span>
+</button></div>
 <div class="group" id="toolbar-right" style="display:flex; align-items:center; justify-content:flex-end; gap:12px; flex:1;">
 <button class="btn" id="toggle-highlight" title="Highlight mode">
 <span class="material-symbols-outlined">draw</span>
@@ -597,9 +597,7 @@ a[class*="next"][class*="chapter"] {
 <button class="btn" id="toc-btn" title="Table of contents">
 <span class="material-symbols-outlined">format_list_numbered</span>
 </button>
-
 <span id="page-indicator">Ch3 Pg4</span>
-</button>
 </div>
 </div>
 <!-- font panel -->
@@ -1513,7 +1511,6 @@ body.theme-dark #font-panel .switch input:checked + .slider{background:#1f73c9}
     })();
   </script>
 <!-- Bar Logic -->
-
 <!-- Highlight Viewer Panel -->
 <style>
   #highlight-panel {
@@ -1717,8 +1714,6 @@ function showFloatingEmoji(emotion) {
   setTimeout(() => emoji.remove(), 1500);
 }
 </script>
-
-
 <script src="/js/highlights.js"></script><script>
 document.addEventListener("DOMContentLoaded", () => {
   const viewer = document.getElementById("reader");
@@ -1774,7 +1769,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 });
 </script>
-
 <button onclick="toggleMode()" style="position:fixed;top:1em;right:1em;z-index:999;">Toggle Mode</button>
 <script>
 function toggleMode() {
@@ -1789,7 +1783,6 @@ function toggleMode() {
   window.location.href = url.toString();
 }
 </script>
-
 <script>
 // Compute an approximate line-height for the chapter and set --lh (fallback to 1em)
 (function initLineHeightBump(){
@@ -1815,7 +1808,6 @@ function toggleMode() {
   window.addEventListener('resize', () => setTimeout(compute, 100));
 })();
 </script>
-
 <script>
 /* Quiet Mode — Brown Noise with gentle fade (iOS-friendly) [QUIET-MODE-1754621504] */
 (function(){
@@ -1922,16 +1914,13 @@ function toggleMode() {
   window.__quiet = { start, stop, toggle };
 })();
 </script>
-
 <script>console.info('[InkWell] QUIET-MODE-1754621504 injected');</script>
-
 <script>
 function waitForSupabase() {
   if(window.SWIPE_DISABLED) return;
   if (typeof supabase !== 'undefined' || typeof sb !== 'undefined') {
     console.log('[InkWell] Supabase client detected, starting reader...');
-    if (typeof initReader === 'function') {
-      initReader();
+    if (!window.__INKWELL_INIT_CALLED && typeof initReader === 'function') { window.__INKWELL_INIT_CALLED = true; initReader();
     } else {
       console.warn('[InkWell] initReader() not found');
     }
@@ -1942,36 +1931,8 @@ function waitForSupabase() {
 }
 document.addEventListener('DOMContentLoaded', waitForSupabase);
 </script>
-
-
 <!-- Transient floating button -->
-
-
-
-
-
 <!-- Transient floating button -->
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 <!-- Swipe Direction Override (SWIPE-ONLY; taps unaffected) -->
 <script>
 (function(){
@@ -2042,7 +2003,6 @@ document.addEventListener('DOMContentLoaded', waitForSupabase);
   }, { passive: false, capture: true });
 })();
 </script>
-
 <script>
 (function(){
   // Find the quiet-mode button via a few likely selectors
@@ -2078,8 +2038,6 @@ document.addEventListener('DOMContentLoaded', waitForSupabase);
   candidates.forEach(makeTapFriendly);
 })();
 </script>
-
-
 <script>
 (function(){
   const el = document.querySelector('#quiet-btn, .btn-quiet, [data-action="quiet"], [aria-label="Quiet mode"], button[title="Quiet mode"]');
@@ -2097,8 +2055,6 @@ document.addEventListener('DOMContentLoaded', waitForSupabase);
   });
 })();
 </script>
-
-
 <script id="inkwell_auth_led">
 (function(){
   const dot = document.getElementById('status-dot');
@@ -2118,11 +2074,6 @@ document.addEventListener('DOMContentLoaded', waitForSupabase);
   setTimeout(apply, 500);
 })();
 </script>
-
-
-
-
-
 <script id="highlight-mode-swipe-disable-hammer">
 (function(){
   const hlBtn = document.getElementById('toggle-highlight');
@@ -2171,8 +2122,6 @@ document.addEventListener('DOMContentLoaded', waitForSupabase);
   enableSwipe();
 })();
 </script>
-
-
 <script id="highlight-mode-global-swipe-disable">
 (function(){
   window.SWIPE_DISABLED = false;
@@ -2189,8 +2138,6 @@ document.addEventListener('DOMContentLoaded', waitForSupabase);
   }
 })();
 </script>
-
-
 <script id="highlight-mode-disable-all-hammer">
 (function(){
   window._INKWELL_HAMMERS = [];
@@ -2234,7 +2181,6 @@ document.addEventListener('DOMContentLoaded', waitForSupabase);
   }
 })();
 </script>
-
 <script>
 // --- Highlight Mode Control ---
 window.INKWELL_HIGHLIGHT_MODE = false;
@@ -2279,7 +2225,6 @@ if (highlightBtn) {
   });
 }
 </script>
-
 <script>
 // Global catcher: hide/remove any broken <img> anywhere (capture = true)
 document.addEventListener('error', function (e) {
@@ -2290,7 +2235,6 @@ document.addEventListener('error', function (e) {
   }
 }, true);
 </script>
-
 <script id="toolbar-centered-cleanup">
 (function(){
   const sels = ['#toolbar .separator', '#toolbar .sep', '#toolbar [role="separator"]', '#toolbar .divider'];
@@ -2299,151 +2243,148 @@ document.addEventListener('error', function (e) {
   });
 })();
 </script>
+
+<!-- Floating Next Chapter Button (appears near end, vertical mode only) -->
 <script>
-
-// ================== InkWell Auto-Advance (Vertical Only) ==================
 (function(){
-  if (window.__INKWELL_AUTOADV_INSTALLED__) return;
-  window.__INKWELL_AUTOADV_INSTALLED__ = true;
+  'use strict';
+  const doc = document;
 
-  // Detect vertical mode robustly
-  function isVerticalMode(){
-    try {
-      if (window.ReaderState?.getMode && window.ReaderState.getMode() === 'vertical') return true;
-      const url = new URL(window.location.href);
-      const vertParam = url.searchParams.get('vert');
-      if (vertParam === 'true') return true;
-      if (document.body.classList.contains('vertical-mode')) return true;
-      const persisted = localStorage.getItem('InkWell:isVertical');
-      return persisted === 'true';
-    } catch(e) { return false; }
+  function getMode(){
+    try { if (window.ReaderState && typeof window.ReaderState.getMode === 'function') return window.ReaderState.getMode(); } catch(e){}
+    const p = new URLSearchParams(location.search).get('vert');
+    if (p === 'true') return 'vertical';
+    if (p === 'false') return 'horizontal';
+    if (doc.body && doc.body.classList.contains('vertical-mode')) return 'vertical';
+    return (localStorage.getItem('InkWell:isVertical') === 'true') ? 'vertical' : 'horizontal';
   }
 
-  // Find the best scroll container
-  function pickContainer(){
-    const order = [
-      '[data-chapter-container]',
-      '#chapter-container',
-      '#reader',
-      '#content',
-      'main',
-      'body'
-    ];
-    for (const sel of order){
-      const el = document.querySelector(sel);
-      if (el) return el;
-    }
-    return document.body;
+  if (getMode() !== 'vertical') return;
+
+  // Create FAB
+  let fab = doc.getElementById('inkwell-next-fab');
+  if (!fab){
+    fab = doc.createElement('button');
+    fab.id = 'inkwell-next-fab';
+    fab.textContent = 'Next';
+    doc.body.appendChild(fab);
   }
 
-  // Advance strategy attempts
-  async function advanceChapter(){
-    console.log('[AutoAdvance] Bottom reached — advancing to next chapter…');
-    if (typeof window.nextChapter === 'function') { window.nextChapter(); return; }
-    if (typeof window.goToNextChapter === 'function') { window.goToNextChapter(); return; }
-    if (typeof window.loadChapter === 'function' && typeof window.currentChapterIndex === 'number'){
-      try { window.loadChapter(window.currentChapterIndex + 1); return; } catch {}
+  // Basic pill styling
+  const style = doc.createElement('style');
+  style.textContent = `#inkwell-next-fab {
+  position: fixed;
+  top: calc(var(--toolbar-h, 48px) + env(safe-area-inset-top, 0px) + 8px);
+  right: calc(env(safe-area-inset-right, 0px) + 12px);
+  left: auto;
+  bottom: auto;
+  z-index: 10000;
+  display: none;
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(0,0,0,.15);
+  background: #111;
+  color: #fff;
+  font: 600 15px/1 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  box-shadow: 0 6px 18px rgba(0,0,0,.25);
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+#inkwell-next-fab.show { display: inline-flex; align-items:center; justify-content:center; }
+#inkwell-next-fab:active { transform: translateY(1px); }`;
+  doc.head.appendChild(style);
+
+  const showFab = () => fab.classList.add('show');
+  const hideFab = () => fab.classList.remove('show');
+
+  function callNextChapter(){
+    if (typeof window.nextChapter === 'function') return window.nextChapter();
+    if (typeof window.goToNextChapter === 'function') return window.goToNextChapter();
+    if (typeof window.loadChapter === 'function' && typeof window.currentChapterIndex !== 'undefined'){
+      return window.loadChapter(window.currentChapterIndex + 1);
     }
-    // Fallback event if host wants to hook it
     window.dispatchEvent(new CustomEvent('inkwell:next-chapter'));
   }
 
-  function attachAutoAdvance(){
-    if (!isVerticalMode()) {
-      // no-op in horizontal
-      return;
-    }
-    const container = pickContainer();
-    if (!container) {
-      console.warn('[AutoAdvance] No scroll container found; skipping.');
-      return;
-    }
+  fab.addEventListener('click', callNextChapter);
 
-    // Create a sentinel at the end of the container
-    const sentinelId = 'inkwell-bottom-sentinel';
-    let sentinel = document.getElementById(sentinelId);
-    if (!sentinel){
-      sentinel = document.createElement('div');
-      sentinel.id = sentinelId;
-      sentinel.style.cssText = 'width:1px;height:1px;opacity:0;';
-      // Append once; for window-scrolling, appending to body is fine
-      (container === document.body ? document.body : container).appendChild(sentinel);
-    }
-
-    let triggered = false;
-    let rearmPlanned = false;
-    let lastHeight = container.scrollHeight || document.body.scrollHeight;
-
-    // Helper to (re)arm after chapter load (detect via height change or events)
-    function planRearm(){
-      if (rearmPlanned) return;
-      rearmPlanned = true;
-      const start = Date.now();
-      const poll = setInterval(() => {
-        const h = container.scrollHeight || document.body.scrollHeight;
-        if (Math.abs(h - lastHeight) > 400 || Date.now() - start > 5000){
-          // content likely changed (new chapter), rearm
-          lastHeight = h;
-          triggered = false;
-          rearmPlanned = false;
-          clearInterval(poll);
-        }
-      }, 250);
-    }
-
-    // Listen for host's chapter-loaded style events to rearm immediately
-    const evtNames = ['inkwell:chapter-loaded','reader:chapterLoaded','chapter:loaded'];
-    const onLoaded = () => { triggered = false; };
-    evtNames.forEach(n => window.addEventListener(n, onLoaded));
-
-    const io = new IntersectionObserver((entries) => {
-      if (!isVerticalMode()) return;
-      for (const e of entries){
-        if (e.isIntersecting && !triggered){
-          // Add a short dwell to avoid accidental edge-hit
-          triggered = true;
-          setTimeout(() => {
-            // verify still bottom-ish
-            const bottom = (container === document.body ? window.scrollY + window.innerHeight : container.scrollTop + container.clientHeight);
-            const max = (container === document.body ? document.documentElement.scrollHeight : container.scrollHeight);
-            if (max - bottom <= 160){
-              advanceChapter();
-              planRearm();
-            } else {
-              // not really bottom; allow re-trigger
-              triggered = false;
-            }
-          }, 300);
-        }
-      }
-    }, {
-      // If container is body/window, root=null observes viewport; else root is the container
-      root: (container === document.body ? null : container),
-      rootMargin: '0px 0px -80px 0px',
-      threshold: 0.99
-    });
-
-    io.observe(sentinel);
-    // Expose a tiny API to rearm manually if needed
-    window.InkWellAutoAdvance = {
-      rearm(){ triggered = false; },
-      detach(){ try{ io.disconnect(); }catch{}; evtNames.forEach(n => window.removeEventListener(n, onLoaded)); }
-    };
-
-    console.log('[AutoAdvance] Enabled in vertical mode.');
+  // Show FAB when near bottom by percentage (last 10%)
+  const THRESHOLD = 0.10; // show in last 10% of chapter height
+  function progressToEnd(){
+    const el = doc.scrollingElement || doc.documentElement;
+    const total = Math.max(1, el.scrollHeight);
+    const seen = el.scrollTop + el.clientHeight;
+    return Math.max(0, (total - seen) / total);
   }
+  function onScroll(){
+    const rem = progressToEnd();
+    if (rem <= THRESHOLD) showFab(); else hideFab();
+  }
+  doc.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  window.InkWellNextFab = { show: showFab, hide: hideFab, rearm: onScroll };
+})();
+</script>
+<script>
+(function nextToolbarWire(){
+  const log = (...a) => console.log("[NextToolbar]", ...a);
+
+  // Resolve vertical mode similarly to your app's logic
+  function isVertical(){
+    try {
+      if (window.ReaderState && typeof window.ReaderState.getMode === 'function') {
+        return window.ReaderState.getMode() === 'vertical';
+      }
+    } catch {}
+    const p = new URLSearchParams(location.search).get('vert');
+    if (p === 'true') return true;
+    if (p === 'false') return false;
+    return (localStorage.getItem('InkWell:isVertical') === 'true');
+  }
+
+  function forwardViaTapZone(){
+    const rightTap = document.querySelector('.edge-shield.right, #rightTapZone, [data-role="tap-right"]');
+    if (rightTap) {
+      try { rightTap.click(); return true; } catch(e){}
+    }
+    return false;
+  }
+  function forwardFallback(){
+    if (typeof window.nextPage === 'function') return window.nextPage();
+    if (typeof window.pageForward === 'function') return window.pageForward();
+    if (typeof window.advancePage === 'function') return window.advancePage();
+    if (typeof window.goToNextPage === 'function') return window.goToNextPage();
+    if (typeof window.next === 'function') return window.next();
+    if (typeof window.nextChapter === 'function') return window.nextChapter();
+    if (typeof window.goToNextChapter === 'function') return window.goToNextChapter();
+    if (typeof window.loadChapter === 'function') {
+      const idx = (window.currentChapterIndex ?? window.chap ?? 0) + 1;
+      return window.loadChapter(idx, 'start');
+    }
+    document.dispatchEvent(new CustomEvent('inkwell:next', { bubbles: true }));
+    document.dispatchEvent(new CustomEvent('inkwell:next-chapter', { bubbles: true }));
+    log("Dispatched inkwell:next (+ next-chapter) – no known function found.");
+  }
+  function goForward(){
+    if (!forwardViaTapZone()) forwardFallback();
+  }
+
+  function applyMode(){
+    const v = isVertical();
+    if (v) document.body.classList.add('vertical-mode'); else document.body.classList.remove('vertical-mode');
+    const btn = }
 
   if (document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', attachAutoAdvance, { once:true });
+    document.addEventListener('DOMContentLoaded', applyMode, { once:true });
   } else {
-    attachAutoAdvance();
+    applyMode();
   }
+
+  // Re-arm after chapter changes if your app fires this event
+  document.addEventListener('chapter:changed', applyMode);
 })();
-// ================== /InkWell Auto-Advance ==================
-
-</script>
-</body>
-
+</script></body>
 <script>
 // Dynamically keep --toolbar-h in sync with actual toolbar height (safe for iOS browser chrome changes)
 (function(){
@@ -2458,8 +2399,6 @@ document.addEventListener('error', function (e) {
   window.addEventListener('orientationchange', function(){ setTimeout(setToolbarH, 200); });
 })();
 </script>
-
-
 <script>
 // Enable a safe vh polyfill only if 100dvh is not supported
 (function(){
@@ -2477,8 +2416,6 @@ document.addEventListener('error', function (e) {
   }
 })();
 </script>
-
-
 <style id="toolbar-balance">
 #toolbar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 0;
   padding-left: max(10px, env(safe-area-inset-left)); padding-right: max(10px, env(safe-area-inset-right)); height: 50px; box-sizing: border-box; }
@@ -2488,15 +2425,12 @@ document.addEventListener('error', function (e) {
 #toolbar-right { justify-content: flex-end; gap: 12px; }
 #page-indicator { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 32vw; font-variant-numeric: tabular-nums; font-size: clamp(.72rem, 2.4vw, .9rem); }
 </style>
-
-
 <style id="highlight-mode-swipe-disable">
 #swipe-left.highlight-disabled,
 #swipe-right.highlight-disabled {
     display: none !important;
 }
 </style>
-
 <style id="toolbar-centered-simple">
 /* Toolbar: centered icons, separators hidden */
 #toolbar {
@@ -2535,4 +2469,65 @@ document.addEventListener('error', function (e) {
   padding: 4px;
 }
 </style>
-</head></html>
+<style>
+/* --- Floating Next Chapter button (FAB) --- */
+  \1bottom: auto;\2
+    z-index: 10000;
+    display: none;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 14px;
+    border-radius: 9999px;
+    background: rgba(20,20,20,.92);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,.12);
+    box-shadow: 0 6px 20px rgba(0,0,0,.25);
+    font: 500 14px/1 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+  #inkwell-next-fab.show { display: inline-flex; }
+  #inkwell-next-fab .icon { font-size: 16px; }
+  #inkwell-next-fab .dismiss {
+    font-size: 16px;
+    opacity: .8;
+    padding: 0 2px;
+  }
+  #inkwell-next-fab:active { transform: translateY(1px); }
+</style>
+<style>
+/* Disable side tap zones in vertical mode so clicks aren't intercepted */
+body.vertical-mode .edge-shield { display: none !important; pointer-events: none !important; }
+</style><style>
+/* Next CTA bar directly below toolbar */
+#next-cta-bar {
+  position: sticky;
+  top: 48px;                 /* adjust if your toolbar is taller */
+  z-index: 19;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 12px;
+  backdrop-filter: blur(6px);
+  background: rgba(17,24,39,.6);
+  border-bottom: 1px solid #1f2937;
+}
+/* Professional pill button */
+#next-toolbar-btn {
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-weight: 600;
+  font-size: 14px;
+  color: #fff;
+  background: #2563eb;
+  box-shadow: 0 8px 18px rgba(0,0,0,.25);
+  cursor: pointer;
+}
+#next-toolbar-btn:hover { background:#1e40af; }
+/* Only show CTA bar in vertical mode */
+body:not(.vertical-mode) #next-cta-bar { display: none; }
+/* Disable side tap zones in vertical mode so they don't steal clicks */
+body.vertical-mode .edge-shield { display: none !important; pointer-events: none !important; }
+</style></head></html>
