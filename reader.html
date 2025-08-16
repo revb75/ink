@@ -2,6 +2,2537 @@
 
 <html lang="en">
 <head>
+  <!-- INKWELL-BUILD: reader.fixed  -->
+  
+<script type="module">
+import { supabase } from './js/supabase.js';
+import { withUser } from './js/auth.js';
+
+withUser(async (uid) => {
+  const params = new URLSearchParams(location.search);
+  const bookId = params.get('book_id') || params.get('book');
+  if (!bookId) return;
+
+  let progress = null;
+const __variants = [bookId, bookId.replace(/\+/g,' '), bookId.replace(/ /g,'+')];
+for (const __v of __variants){
+  const { data, error } = await supabase
+    .from('reading_progress')
+    .select('chapter_index,page_number')
+    .eq('user_id', uid)
+    .eq('book_id', __v)
+
+  if (!error){ progress = data; break; }
+  console.warn('[InkWell] progress fetch failed for variant %o:', __v, error);
+}
+
+  if (typeof initReader === 'function') {
+    initReader(progress || { chapter_index: 0, page_number: 0 });
+  } else {
+    console.error('[Reader] initReader not found.');
+  }
+});
+
+// Inline Supabase bootstrap (no external /js/supabase.js needed)
+(function(){
+  const SUPABASE_URL = window.INKWELL_SUPABASE_URL || 'https://hrxkqvifqawrnpzokome.supabase.co';
+  const SUPABASE_ANON_KEY = window.INKWELL_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhyeGtxdmlmcWF3cm5wem9rb21lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcxNzQ0MDIsImV4cCI6MjA2Mjc1MDQwMn0.UZVhGweJEQBxqtrp37G77YmAefQWZYDGzdk1lyj4ua4';
+  
+
+  // bootstrap stub; external supabase handles client
+})();
+</script>
+
+
+  <script>
+// /js/reader-state.fixed.js
+// Robust gating for vertical vs. horizontal with deduped logs.
+// Exposes window.ReaderState with setScrollResolver, onProgress, refresh, setModeVertical, getMode.
+
+(function(){
+  'use strict';
+
+  if (window.__INKWELL_READER_STATE__) return;
+  window.__INKWELL_READER_STATE__ = true;
+
+  const on = (el, ev, fn, opts) => el.addEventListener(ev, fn, opts||false);
+
+  function resolveIsVertical(){
+    if (window.INKWELL_MODE && typeof window.INKWELL_MODE.isVertical === 'boolean') return window.INKWELL_MODE.isVertical;
+    const persisted = localStorage.getItem('InkWell:isVertical');
+    const url = new URL(window.location.href);
+    const vertParam = url.searchParams.get('vert');
+    if (vertParam === 'true') return true;
+    if (vertParam === 'false') return false;
+    return persisted === 'true';
+  }
+
+  function throttle(fn, ms){
+    let last = 0, timer = null, lastArgs = null;
+    return function(){
+      lastArgs = arguments;
+      const now = Date.now();
+      const rem = ms - (now - last);
+      if (rem <= 0){
+        last = now;
+        fn.apply(this, lastArgs);
+      } else if (!timer){
+        timer = setTimeout(() => {
+          timer = null;
+          last = Date.now();
+          fn.apply(this, lastArgs);
+        }, Math.max(0, rem));
+      }
+    };
+  }
+
+  function defaultResolver(){
+    const chapter = 0;
+    const page = Math.max(0, Math.round(window.scrollY / Math.max(1, window.innerHeight * 0.9)));
+    return { chapter, page };
+  }
+
+  let isVertical = resolveIsVertical();
+  let resolver = defaultResolver;
+  let scrollHandler = null;
+  let lastKey = '';
+  let skipLogged = false;
+
+  let onProgress = ({chapter, page}) => {
+    console.log('📖 Saving vertical progress: Chapter %d, Page %d', chapter, page);
+  };
+
+  function attachScroll(){
+    if (scrollHandler) return;
+    const handler = throttle(function(){
+      const {chapter, page} = resolver();
+      const key = chapter + ':' + page;
+      if (key !== lastKey){
+        lastKey = key;
+        try { onProgress({chapter, page}); } catch(e){ console.error('onProgress error:', e); }
+      }
+    }, 200);
+    scrollHandler = handler;
+    on(window, 'scroll', handler, { passive: true });
+    handler();
+  }
+
+  function detachScroll(){
+    if (!scrollHandler) return;
+    window.removeEventListener('scroll', scrollHandler, { passive: true });
+    scrollHandler = null;
+  }
+
+  function applyMode(){
+    isVertical = resolveIsVertical();
+    if (isVertical){
+      console.info('ℹ️ Vertical mode (persisted)');
+      attachScroll();
+    } else {
+      console.info('ℹ️ Horizontal mode (persisted)');
+      if (!skipLogged){
+        console.info('🚫 Skipping scroll tracking in horizontal mode');
+        skipLogged = true;
+      }
+      detachScroll();
+    }
+  }
+
+  if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', applyMode, { once: true });
+  } else {
+    applyMode();
+  }
+
+  window.ReaderState = {
+    setScrollResolver(fn){ if (typeof fn === 'function') resolver = fn; },
+    onProgress(fn){ if (typeof fn === 'function') onProgress = fn; },
+    refresh(){ applyMode(); },
+    setModeVertical(v){ 
+      const b = v === true;
+      localStorage.setItem('InkWell:isVertical', String(b));
+      if (!window.INKWELL_MODE) window.INKWELL_MODE = {};
+      window.INKWELL_MODE.isVertical = b;
+      applyMode();
+    },
+    getMode(){ return isVertical ? 'vertical' : 'horizontal'; }
+  };
+})();
+
+</script>
+<style>
+  #toolbar {
+    position: fixed !important;
+    top: env(safe-area-inset-top, 0) !important;
+    left: 0 !important;
+    right: 0 !important;
+    height: 50px !important;
+    background: #f5f5f5 !important;
+    z-index: 10000 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    pointer-events: all !important;
+  }
+  body { padding-top: var(--toolbar-h, calc(50px + env(safe-area-inset-top, 0))) !important; }
+
+/* --- InkWell swipe + layout tweaks (MVP) --- */
+#reader { 
+  touch-action: pan-y pinch-zoom;
+}
+html, body { 
+  overscroll-behavior-x: none;
+}
+/* removed negative translateY to prevent top-line clipping on mobile */
+.edge-shield {
+  position: fixed; top: 0; bottom: 0; width: 32px; z-index: 10000;
+  pointer-events: auto; background: transparent;
+}
+.edge-shield.left  { left: 0; }
+.edge-shield.right { right: 0; }
+
+#quiet-btn.active { background: rgba(0,0,0,.08); }
+</style>
+<meta charset="utf-8"/>
+<title>InkWell EPUB Reader</title>
+<meta content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" name="viewport"/>
+<!-- fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@300..700" rel="stylesheet"/>
+<style>
+    * { box-sizing: border-box; margin:0; padding:0; }
+    body { background:#fafafa; color:#333; font-family:'Lora',serif; line-height:1.65; }
+
+    .material-symbols-outlined {
+      font-family:'Material Symbols Outlined';
+      font-variation-settings:'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      font-size:24px; color:#555;
+      display:inline-flex; align-items:center; justify-content:center;
+    }
+
+    /* Login */
+    #login-screen { position:fixed; inset:0; background:#fff; display:none; align -items:center; justify-content:center; z-index:300; }
+    #login-screen.active { display:flex; }
+    #login-form { display:flex; flex-direction:column; gap:1rem; padding:2rem; border:1px solid #ddd; border-radius:8px; background:#f9f9f9; box-shadow:0 2px 8px rgba(0,0,0,.1); }
+    #login-form input { padding:.5rem; border:1px solid #888; border-radius:4px; }
+    #login-form button { padding:.75rem; background:#0066cc; color:#fff; border:none; border-radius:4px; cursor:pointer; }
+
+    /* Toolbar */
+    #toolbar {
+      height:50px; background:#ededed; border-bottom:1px solid #ccc;
+      display:flex; justify-content:space-between; align-items:center;
+      padding:0 14px; user-select:none;
+    }
+    .group { display:flex; gap:14px; align-items:center; }
+    .btn {
+      width:40px; height:40px; border:none; background:none; cursor:pointer;
+      display:flex; align-items:center; justify-content:center; border-radius:8px;
+      transition:background .18s;
+    }
+    .btn:hover { background:rgba(0,0,0,.06); }
+    .btn.active .material-symbols-outlined { color:#c00; }
+    #status-dot { width:10px; height:10px; border-radius:50%; background:#d40000; }
+    #page-indicator { font-size:.9rem; color:#333; padding:0 8px; }
+
+    /* Emotion bar / layout vars */
+    :root {
+      --emotion-bar-height:16px;
+      --emotion-extra-gap:20px;
+      --safe-bottom:env(safe-area-inset-bottom,0px);
+      --reader-bottom-pad:calc(var(--emotion-bar-height) + var(--emotion-extra-gap) + var(--safe-bottom));
+      --reader-font-size:18px;
+    
+  --toolbar-h: calc(50px + env(safe-area-inset-top, 0px));
+}
+
+    /* Reader (base horizontal / paginated defaults) */
+    #reader {
+      height:calc(100dvh - 64px);
+      overflow-x:scroll; overflow-y:hidden;
+      scroll-behavior:smooth;
+      padding:20px 16px 20px 16px;
+      text-align:justify; column-gap:2rem;
+      font-size:var(--reader-font-size);
+    }
+    #reader::-webkit-scrollbar { display:none; }
+    #reader { -ms-overflow-style:none; scrollbar-width:none; }
+    .chapter-wrapper {
+      break-before:column; -webkit-column-break-before:always;
+      break-inside:avoid; margin-bottom:2rem;
+    }
+
+    /* Emotion heatmap bar (original gradient 8 zones) */
+    #emotional-heatmap {
+      position:fixed;
+      inset-inline:0;
+      bottom:0;
+      height:var(--emotion-bar-height);
+      background:linear-gradient(
+        to right,
+        #3b83bd,
+        #5c6bc0,
+        #ffeb3b,
+        #fbc02d,
+        #ec407a,
+        #f44336,
+        #e91e63,
+        #81c784
+      );
+      z-index:20;
+      user-select:none;
+      overflow:hidden;
+    }
+    .emotion-zone {
+      position:absolute;
+      top:0;
+      height:100%;
+      width:12.5%;
+      cursor:pointer;
+    }
+    .emotion-zone:hover { filter:brightness(1.15); }
+    body.highlight-mode .emotion-zone { pointer-events:none; opacity:.35; }
+
+    #emotion-popup {
+      display:none; position:fixed; bottom:calc(var(--emotion-bar-height) + 8px + var(--safe-bottom)); left:50%;
+      transform:translateX(-50%); background:#222; color:#fff;
+      padding:12px 16px; border-radius:10px; box-shadow:0 4px 16px rgba(0,0,0,.4);
+      z-index:1000; font-size:14px; text-align:center;
+    }
+    #emotion-popup button { margin-top:6px; margin-inline:6px; }
+
+    body.paginated-mode:not(.highlight-mode) {
+      overflow:hidden; position:fixed; width:100%;
+    }
+    body.paginated-mode #reader {
+      overscroll-behavior:none;
+      touch-action:pan-y pinch-zoom;
+    }
+
+    /* Vertical mode (updated) */
+    body.vertical-mode {
+      overflow:auto;
+      position:static;
+    }
+    body.vertical-mode #reader {
+      height:auto;
+      max-height:none;
+      overflow-y:auto;
+      overflow-x:hidden;
+      column-gap:0;
+      column-width:auto !important;
+      white-space:normal;
+      padding-bottom:calc(var(--emotion-bar-height) + var(--emotion-extra-gap) + var(--safe-bottom) + 40px);
+      scroll-behavior:auto;
+    }
+    body.vertical-mode #reader .chapter-wrapper {
+      break-before:auto;
+      -webkit-column-break-before:auto;
+    }
+
+    /* Highlights */
+    .user-highlight,
+    .highlighted {
+      background:#cce5ff;
+      cursor:pointer;
+      transition:background .2s;
+    }
+
+/* === Dark theme: make highlights readable on black background === */
+body.theme-dark #reader .user-highlight,
+body.theme-dark #reader .highlighted {
+  background: #ffffff !important;
+  color: #000000 !important;
+  /* slight inset outline for crisp edges on OLED blacks */
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.55) inset;
+}
+body.theme-dark #reader .user-highlight:active,
+body.theme-dark #reader .highlighted:active {
+  background: #f2f2f2 !important;
+}
+
+/* Also invert live text selection inside the reader in dark mode */
+body.theme-dark #reader ::selection {
+  background: #ffffff;
+  color: #000000;
+}
+
+
+    .user-highlight:active { background:#b5d9ff; }
+
+    /* Highlight note modal */
+    #highlight-note-modal {
+      display:none; position:fixed; inset:0; z-index:1100;
+      background:rgba(0,0,0,.35); backdrop-filter:blur(3px);
+    }
+    #highlight-note-modal .modal-card {
+      position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+      background:#fff; width:min(92vw,560px); max-height:80vh;
+      padding:20px 22px 18px; border-radius:18px;
+      box-shadow:0 8px 30px -4px rgba(0,0,0,.35);
+      display:flex; flex-direction:column; gap:14px;
+      font-family:Lora,serif;
+    }
+    #highlight-note-modal h3 { margin:0; font-size:1.05rem; font-weight:600; letter-spacing:.5px; }
+    #highlighted-passage {
+      background:#f3f7fb; border:1px solid #d2dbe3; padding:10px 12px; border-radius:10px;
+      font:400 .95rem/1.4 Lora,serif; max-height:140px; overflow:auto; white-space:pre-wrap;
+    }
+    #highlight-note-text {
+      width:100%; flex:1; min-height:120px; font:400 1rem/1.45 Lora,serif;
+      padding:10px 12px; border:1px solid #bbb; border-radius:10px; resize:vertical;
+      background:#fafafa;
+    }
+    #highlight-note-actions { display:flex; gap:10px; flex-wrap:wrap; }
+    #highlight-note-actions button {
+      flex:1 1 auto; padding:10px 14px; border:none; border-radius:10px; cursor:pointer;
+      font:500 .9rem/1 Lora,serif; letter-spacing:.4px;
+    }
+    .btn-secondary { background:#999; color:#fff; }
+    .btn-primary { background:#0066cc; color:#fff; }
+    .btn-danger { background:#d43838; color:#fff; flex:0 0 auto; }
+
+    @media (max-width:480px) {
+      #highlight-note-modal .modal-card { padding:18px 16px 16px; }
+      #highlight-note-text { min-height:100px; }
+      #highlighted-passage { max-height:110px; }
+    }
+
+    /* Font Panel */
+    #font-panel {
+      position:fixed;
+      top:60px;
+      right:12px;
+      width:300px;
+      max-width:90vw;
+      background:#ffffffee;
+      backdrop-filter:blur(10px);
+      border:1px solid #cfcfcf;
+      border-radius:14px;
+      padding:14px 16px 16px;
+      z-index:400;
+      font-family:system-ui,-apple-system,Segoe UI,Inter,sans-serif;
+      display:none;
+      box-shadow:0 8px 28px -6px rgba(0,0,0,0.35);
+    }
+    #font-panel.active { display:block; }
+    #font-panel h4 {
+      margin:0 0 10px;
+      font:600 14px/1.2 Inter,system-ui,sans-serif;
+      letter-spacing:.5px;
+      text-transform:uppercase;
+      opacity:.75;
+    }
+    #font-panel label { display:flex; flex-direction:column; gap:6px; font-size:13px; margin-bottom:12px; }
+    #font-panel select,
+    #font-panel input[type=range] { width:100%; }
+    .theme-row { display:flex; gap:8px; }
+    .theme-swatch {
+      flex:1;
+      height:34px;
+      border-radius:10px;
+      border:1px solid #aaa;
+      cursor:pointer;
+      position:relative;
+      font-size:0;
+    }
+    .theme-swatch.active::after {
+      content:"";
+      position:absolute;
+      inset:4px;
+      border:2px solid #0066cc;
+      border-radius:6px;
+      pointer-events:none;
+    }
+    .theme-swatch[data-theme=light] { background:#fff; }
+    .theme-swatch[data-theme=dark] { background:#1e1f20; }
+    .theme-swatch[data-theme=sepia] { background:#f5e3c5; }
+    .theme-swatch[data-theme=matcha] { background:#e3f3dd; }
+    #font-size-display {
+      font:600 13px/1 Inter,system-ui,sans-serif;
+      min-width:2ch;
+      text-align:right;
+    }
+    #close-font-panel {
+      position:absolute;
+      top:6px;
+      right:6px;
+      width:28px; height:28px;
+      background:transparent;
+      border:none;
+      border-radius:8px;
+      cursor:pointer;
+      font-size:18px;
+      line-height:1;
+    }
+    #close-font-panel:hover { background:rgba(0,0,0,.07); }
+
+    /* Themes */
+    body.theme-dark { background:#121314; color:#e4e4e4; }
+    body.theme-sepia { background:#f4ecd8; color:#4b3a22; }
+    body.theme-matcha { background:#F2F8EE; color:#1e3123; }
+    body.theme-dark #toolbar { background:#1d1f21; border-color:#2a2d2f; }
+    body.theme-sepia #toolbar { background:#eadbc2; }
+    body.theme-matcha #toolbar { background:#e1ecdc; }
+
+    /* TOC Panel */
+    #toc-panel {
+      position:fixed;
+      top:60px;
+      left:12px;
+      width:300px;
+      max-width:85vw;
+      max-height:calc(100dvh - 90px);
+      display:none;
+      flex-direction:column;
+      background:#ffffffee;
+      backdrop-filter:blur(10px);
+      border:1px solid #cfcfcf;
+      border-radius:14px;
+      padding:14px 14px 16px;
+      z-index:450;
+      font-family:system-ui,-apple-system,Segoe UI,Inter,sans-serif;
+      box-shadow:0 10px 34px -8px rgba(0,0,0,.35);
+      overflow:auto;
+    }
+    #toc-panel.active { display:flex; }
+    #toc-panel .toc-header {
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+      margin-bottom:10px;
+    }
+    #toc-panel h4 {
+      margin:0;
+      font:600 14px/1.2 Inter,system-ui,sans-serif;
+      letter-spacing:.5px;
+      text-transform:uppercase;
+      opacity:.75;
+    }
+    #toc-close {
+      background:transparent;
+      border:none;
+      width:32px; height:32px;
+      font-size:20px;
+      border-radius:8px;
+      cursor:pointer;
+    }
+    #toc-close:hover { background:rgba(0,0,0,.07); }
+    #toc-list {
+      list-style:decimal;
+      margin:0;
+      padding:0 0 0 20px;
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      font:500 13px/1.3 Inter,system-ui,sans-serif;
+    }
+    #toc-list li {
+      cursor:pointer;
+      padding:4px 6px;
+      border-radius:6px;
+      transition:background .15s;
+      word-break:break-word;
+    }
+    #toc-list li:hover { background:rgba(0,0,0,.07); }
+    #toc-list li.current {
+      background:#0066cc;
+      color:#fff;
+    }
+    body.theme-dark #toc-panel { background:#1d1f21ee; border-color:#2a2d30; }
+    body.theme-dark #toc-list li:hover { background:#2b3136; }
+    body.theme-dark #toc-list li.current { background:#1f73c9; }
+    body.theme-sepia #toc-panel { background:#eadbc2ee; }
+    body.theme-matcha #toc-panel { background:#e1ecdcdd; }
+
+    
+  
+/* Ensure bottom padding accounts for emotion bar */
+#reader { padding-bottom: calc(var(--emotion-bar-height) + var(--emotion-extra-gap) + var(--safe-bottom)); }
+
+/* Activate only when JS adds .vh-polyfill to <html> */
+.vh-polyfill #reader {
+  min-height: calc(var(--vh, 1vh) * 100 - var(--toolbar-h)) !important;
+}
+
+
+/* Floating '' button: safe-area aware, never overlaps toolbar */
+#next-chapter-btn {
+  position: fixed;
+  right: 12px;
+  bottom: calc(var(--toolbar-h) + env(safe-area-inset-bottom, 0px) + 12px);
+  z-index: 2500;
+  padding: 12px 16px;
+  border-radius: 9999px;
+  border: none;
+  background: #1e73ff;
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 6px 18px rgba(0,0,0,.2);
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+  transition: opacity .22s ease, transform .22s ease;
+}
+#next-chapter-btn.show {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+#next-chapter-btn:active { transform: translateY(1px); }
+
+
+/* Force our button to bottom-right; neutralize any inherited 'top' */
+#next-chapter-btn {
+  top: auto !important;
+  bottom: calc(var(--toolbar-h) + env(safe-area-inset-bottom, 0px) + 12px) !important;
+  right: 12px !important;
+  left: auto !important;
+}
+/* Nuke any legacy top-right Next buttons that might linger */
+button[aria-label*="" i]:not(#next-chapter-btn),
+a[aria-label*="" i],
+button[class*="next"][class*="chapter"]:not(#next-chapter-btn),
+a[class*="next"][class*="chapter"] {
+  display: none !important;
+  pointer-events: none !important;
+}
+
+
+@media (hover:hover) {
+  #next-chapter-btn:hover { filter: brightness(1.05); }
+}
+
+
+/* Professional, minimal pill button — safe-area aware, above toolbar */
+#next-chapter-btn {
+  position: fixed;
+  inset: auto 14px calc(var(--toolbar-h) + env(safe-area-inset-bottom, 0px) + 14px) auto;
+  z-index: 2500;
+  padding: 12px 16px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(20,20,20,0.72);
+  color: #fff;
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 1;
+  letter-spacing: .2px;
+  box-shadow: 0 10px 24px rgba(0,0,0,.28);
+  -webkit-tap-highlight-color: transparent;
+  backdrop-filter: saturate(120%) blur(4px);
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+  transition: opacity .18s ease, transform .18s ease;
+}
+#next-chapter-btn.show {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+#next-chapter-btn:active { transform: translateY(1px); }
+@media (hover:hover) {
+  #next-chapter-btn:hover { filter: brightness(1.06); }
+}
+#next-chapter-btn:focus-visible {
+  outline: 2px solid rgba(255,255,255,0.6);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(255,255,255,0.25), 0 10px 24px rgba(0,0,0,.28);
+}
+
+</style>
+<style id="inkwell-css-override">
+  .chapter, .page {
+    margin: 0 !important;
+    padding: 1rem !important;
+    box-sizing: border-box !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  .chapter * {
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  body, html {
+    overflow-x: hidden !important;
+  }
+</style>
+<style id="reader-height-override">
+  /* Layered fallbacks for older browsers */
+  #reader {
+    min-height: calc(100vh - var(--toolbar-h)) !important;   /* oldest */
+    min-height: calc(100svh - var(--toolbar-h)) !important;  /* small viewport */
+    min-height: calc(100dvh - var(--toolbar-h)) !important;  /* dynamic viewport (best) */
+  }
+</style>
+<style>
+@keyframes floatUpFade {
+  0% { transform: translateY(0); opacity: 1; }
+  100% { transform: translateY(-100px); opacity: 0; }
+}
+.floating-emoji {
+  position: absolute;
+  font-size: 2rem;
+  z-index: 9999;
+  animation: floatUpFade 1.2s ease-out forwards;
+  pointer-events: none;
+}
+</style>
+<style>img { max-width: 100% !important; height: auto !important; display: block; }</style>
+<body>
+<style id="chpg-compact-override">
+#page-indicator{
+  font-size:.78rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing:.1px;
+  line-height:1;
+  padding:0 .25rem;
+  white-space:nowrap;
+}
+@media (max-width:420px){ #page-indicator{ font-size:.72rem; } }
+</style>
+
+
+<script type="module">
+</script>
+<div id="toolbar" style="width:100%; display:flex; justify-content:space-between; align-items:center; padding: 0 8px; box-sizing:border-box;">
+<div class="group" id="toolbar-left" style="display:flex; align-items:center; gap:12px; flex:1;">
+<button class="btn" title="Connection status">
+<span id="status-dot"></span>
+<span style="font-size: 10px; color: #888; margin-left: 4px;">25r1</span>
+</button>
+<button class="btn" id="library" title="Library">
+<span class="material-symbols-outlined">library_books</span>
+</button>
+</div>
+<div class="group" id="toolbar-center" style="display:flex; justify-content:center; flex:1;">
+<button class="btn" id="quiet-btn" title="Quiet mode (brown noise)">
+  <span class="material-symbols-outlined">spa</span>
+</button>
+</div>
+<div class="group" id="toolbar-right" style="display:flex; align-items:center; justify-content:flex-end; gap:12px; flex:1;">
+<button class="btn" id="toggle-highlight" title="Highlight mode">
+<span class="material-symbols-outlined">draw</span>
+</button>
+<button class="btn" id="font-btn" title="Font &amp; theme">
+<span class="material-symbols-outlined">font_download</span>
+</button>
+<button class="btn" id="toc-btn" title="Table of contents">
+<span class="material-symbols-outlined">format_list_numbered</span>
+</button>
+
+<span id="page-indicator">Ch3 Pg4</span>
+</button>
+</div>
+</div>
+<!-- font panel -->
+<div aria-hidden="true" id="font-panel">
+<button aria-label="Close font panel" id="close-font-panel">×</button>
+<h4>Font &amp; Theme</h4>
+<label>Font Family
+      <select id="fp-font-family">
+<option value="'Lora',serif">Lora (Serif)</option>
+<option value="Georgia,serif">Georgia (Serif)</option>
+<option value="'Merriweather',serif">Merriweather</option>
+<option value="'Literata',serif">Literata (Serif)</option>
+<option value="Inter,system-ui,sans-serif">Inter (Sans)</option>
+<option value="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,sans-serif">System UI</option>
+</select>
+</label>
+<label>Font Size
+      <div style="display:flex;align-items:center;gap:10px;">
+<input id="fp-font-size" max="28" min="14" type="range" value="18"/>
+<span id="font-size-display">18</span>
+</div>
+</label>
+<label>Themes
+      <div class="theme-row">
+<button aria-label="Light" class="theme-swatch" data-theme="light"></button>
+<button aria-label="Dark" class="theme-swatch" data-theme="dark"></button>
+<button aria-label="Sepia" class="theme-swatch" data-theme="sepia"></button>
+<button aria-label="Matcha" class="theme-swatch" data-theme="matcha"></button>
+</div>
+</label>
+</div>
+<!-- TOC Panel -->
+<div aria-hidden="true" id="toc-panel">
+<div class="toc-header">
+<h4>Table of Contents</h4>
+<button aria-label="Close TOC" id="toc-close">×</button>
+</div>
+<ol id="toc-list"></ol>
+</div>
+<!-- reader -->
+<div id="reader"></div>
+<div class="edge-shield left"></div>
+<div class="edge-shield right"></div>
+<!-- emotion bar -->
+<div id="emotional-heatmap">
+<div class="emotion-zone" data-emotion="Sadness 💧" style="left:0%"></div>
+<div class="emotion-zone" data-emotion="Tension 😨" style="left:12.5%"></div>
+<div class="emotion-zone" data-emotion="Confused 🤔" style="left:25%"></div>
+<div class="emotion-zone" data-emotion="Amusement 😂" style="left:37.5%"></div>
+<div class="emotion-zone" data-emotion="Romantic ❤️" style="left:50%"></div>
+<div class="emotion-zone" data-emotion="Desire 🔥" style="left:62.5%"></div>
+<div class="emotion-zone" data-emotion="Obsession 😍" style="left:75%"></div>
+<div class="emotion-zone" data-emotion="Elated 🙌" style="left:87.5%"></div>
+</div>
+<!-- emotion popup -->
+<div id="emotion-popup">
+<div id="emotion-label"></div>
+<button onclick="confirmEmotion()">Select</button>
+<button onclick="cancelEmotion()">Cancel</button>
+</div>
+<!-- highlight note modal -->
+<div aria-hidden="true" id="highlight-note-modal">
+<div aria-label="Highlight Note" aria-modal="true" class="modal-card" role="dialog">
+<h3 id="highlight-modal-title">Highlight</h3>
+<div id="highlighted-passage"></div>
+<textarea id="highlight-note-text" placeholder="Add / edit note..."></textarea>
+<div id="highlight-note-actions">
+<button class="btn-secondary" id="highlight-note-close" type="button">Close</button>
+<button class="btn-primary" id="highlight-note-save" type="button">Save</button>
+<button class="btn-danger" id="highlight-note-delete" type="button">Delete</button>
+</div>
+</div>
+</div>
+<!-- rangy / highlight libs -->
+<script src="/js/rangy-core.min.js"></script>
+<script src="/js/rangy-classapplier.min.js"></script>
+<script src="/js/rangy-highlighter.min.js"></script>
+<!-- highlight module -->
+<!-- main module -->
+<script type="module">
+    import { fetchBookIdBySlug, insertEmotionLog } from '/js/fetch.js';
+
+    
+    
+    
+
+    const statusDot = document.getElementById('status-dot'),
+          setLED = on => statusDot.style.background = on ? '#08c769' : '#d40000',
+          loginScreen = document.getElementById('login-screen'),
+          loginForm = document.getElementById('login-form'),
+          emailEl = document.getElementById('email'),
+          passEl = document.getElementById('password'),
+          reader = document.getElementById('reader'),
+          pageTxt = document.getElementById('page-indicator'),
+          hlBtn = document.getElementById('toggle-highlight');
+
+    let spine = [], chap = 0, page = 0, total = 1, gap = 0, padL = 0, padR = 0,
+        bookId, slug, BASE, userId;
+
+    /* ---------- Highlight Modal Elements ---------- */
+    const highlightModal = document.getElementById('highlight-note-modal');
+    const passageBox = document.getElementById('highlighted-passage');
+    const noteBox = document.getElementById('highlight-note-text');
+    const btnClose = document.getElementById('highlight-note-close');
+    const btnSave = document.getElementById('highlight-note-save');
+    const btnDelete = document.getElementById('highlight-note-delete');
+    let currentDbId = null;
+
+    function openModal(row) {
+  if(window.SWIPE_DISABLED) return;
+      currentDbId = row.id;
+      passageBox.textContent = row.text || '';
+      noteBox.value = row.note || '';
+      document.getElementById('highlight-modal-title').textContent = 'Highlight';
+      highlightModal.style.display = 'block';
+      highlightModal.setAttribute('aria-hidden', 'false');
+      noteBox.focus();
+    }
+
+    function closeModal() {
+  if(window.SWIPE_DISABLED) return;
+      highlightModal.style.display = 'none';
+      highlightModal.setAttribute('aria-hidden', 'true');
+      currentDbId = null;
+
+      // Turn off highlight mode if active
+      if (document.body.classList.contains('highlight-mode')) {
+        highlightModule.toggleMode(false);
+        hlBtn.classList.remove('active');
+      }
+    }
+
+    btnClose.onclick = closeModal;
+    highlightModal.addEventListener('click', (e) => {
+      if (e.target === highlightModal) closeModal();
+    });
+
+    btnSave.onclick = async () => {
+      if (!currentDbId) return;
+      const { error } = await window.supabase.from('highlights')
+        .update({ note: noteBox.value.trim() || null })
+        .eq('id', currentDbId)
+        .eq('user_id', userId);
+      if (error) { alert('Save failed'); console.error(error); return; }
+      document.querySelectorAll(`[data-db-id="${currentDbId}"]`).forEach((el) => {
+        el.dataset.note = noteBox.value.trim();
+      });
+      closeModal();
+    };
+
+    btnDelete.onclick = async () => {
+      if (!currentDbId) return;
+      if (!confirm('Delete this highlight?')) return;
+      const { error } = await window.supabase.from('highlights')
+        .delete().eq('id', currentDbId).eq('user_id', userId);
+      if (error) { alert('Delete failed'); console.error(error); return; }
+      document.querySelectorAll(`[data-db-id="${currentDbId}"]`).forEach((el) => {
+        el.replaceWith(el.textContent);
+      });
+      currentDbId = null;
+      closeModal();
+    };
+    async function saveReadingProgress(chIndex, pg) {
+  if(window.SWIPE_DISABLED) return;
+    const __u = new URL(window.location.href);
+const __isVertical = document.body.classList.contains('vertical-mode')
+  || __u.searchParams.get('vert') === 'true'
+  || localStorage.getItem('InkWell:isVertical') === 'true';
+if (!__isVertical) { return; }
+const currentChapter = window.currentChapter ?? (window.chapter ?? 0);
+  console.log(`📖 Saving vertical progress: Chapter ${currentChapter}, Page ${pg}`);
+const { data:{ session } } = await window.supabase.auth.getSession();
+      const uid = session?.user?.id;
+      if (!uid || !bookId) return;
+const { error } = await supabase.from('reading_progress').upsert({
+  user_id: uid, book_id: bookId, chapter_index: chIndex,
+  page_number: pg, book_slug: slug, recorded_at: new Date().toISOString()
+}, { onConflict:['user_id','book_id'] });
+if (error) console.error('[InkWell] upsert reading_progress failed:', error);
+if (error && error.code !== '409') console.error('Save progress failed', error);
+    }
+
+    function relayout() {
+  if(window.SWIPE_DISABLED) return;
+      if (document.body.classList.contains('vertical-mode')) {
+        updateUI();
+        return;
+      }
+      gap  = parseFloat(getComputedStyle(reader).columnGap) || 0;
+      padL = parseFloat(getComputedStyle(reader).paddingLeft);
+      padR = parseFloat(getComputedStyle(reader).paddingRight);
+      const cw = reader.clientWidth - padL - padR;
+      reader.style.columnWidth = `${cw}px`;
+      const fudge = 2;
+      total = Math.max(1, Math.ceil((reader.scrollWidth + fudge) / (cw + gap)));
+      reader.scrollTo({ left: (cw + gap) * page, behavior: 'auto' });
+      updateUI();
+      window.__adjustEmotionPadding && window.__adjustEmotionPadding();
+    }
+
+    /* ===== Chapter Number Parsing ===== */
+    let chapterMeta = [];
+    let numberedChapters = [];
+    let displayChapterTotal = 0;
+    function buildChapterMeta() {
+  if(window.SWIPE_DISABLED) return;
+      chapterMeta = spine.map((file, i) => {
+        const base = file.split('/').pop().replace(/\.(xhtml|html|xml)$/i,'');
+        const match = base.match(/(?:^|[^a-z0-9])(\d{1,3})(?![a-z0-9])/i);
+        let num = null;
+        if (match) {
+          const n = parseInt(match[1], 10);
+          if (n > 0 && n < 1000) num = n;
+        }
+        if (num !== null) {
+          const lowered = base.toLowerCase();
+          const plausible =
+            /^[0-9]{1,3}[\-_]/.test(base) ||
+            lowered.includes('ch') ||
+            lowered.includes('chapter') ||
+            lowered.match(/^[0-9]{1,3}$/);
+          if (!plausible) num = null;
+        }
+        return { spineIndex: i, file, chapterNumber: num };
+      });
+      numberedChapters = chapterMeta.filter(c => c.chapterNumber !== null);
+      if (numberedChapters.length) {
+        displayChapterTotal = Math.max(...numberedChapters.map(c => c.chapterNumber));
+      } else {
+        displayChapterTotal = spine.length;
+      }
+      window.__chapterMeta = chapterMeta;
+    }
+    function getDisplayChapterNumber(spineIndex) {
+  if(window.SWIPE_DISABLED) return;
+      const meta = chapterMeta[spineIndex];
+      return meta ? meta.chapterNumber : null;
+    }
+    /* ===== End Chapter Number Parsing ===== */
+
+    function updateUI() {
+  if(window.SWIPE_DISABLED) return;
+  // 📌 Align last page left and reduce padding
+  const wrap = reader.querySelector('.chapter-wrapper');
+  if (wrap) {
+    if (page + 1 === total) {
+      wrap.style.textAlign = 'left';
+      wrap.style.paddingInline = '0 20px';
+    } else {
+      wrap.style.textAlign = 'justify';
+      wrap.style.paddingInline = '';
+    }
+  }
+      let dispNum = getDisplayChapterNumber(chap);
+      if (displayChapterTotal && dispNum !== null) {
+        pageTxt.textContent = `${(dispNum ?? (chap+1))}⋮${page+1}`;
+      } else if (displayChapterTotal && dispNum === null && numberedChapters.length) {
+        pageTxt.textContent = `${(dispNum ?? (chap+1))}⋮${page+1}`;
+      } else {
+        pageTxt.textContent = `${(dispNum ?? (chap+1))}⋮${page+1}`;
+      }
+    }
+
+    async function gotoPage(n, smooth = true) {
+  if(window.SWIPE_DISABLED) return;
+      page = Math.max(0, Math.min(n, total - 1));
+      const cw = reader.clientWidth - padL - padR;
+      reader.scrollTo({ left: (cw + gap) * page, behavior: smooth ? 'smooth' : 'auto' });
+      updateUI();
+      await saveReadingProgress(chap, page);
+    }
+
+    async function loadChapter(i, startAt='start'){
+  if(window.SWIPE_DISABLED) return;
+      if(i<0 || i>=spine.length) return;
+      chap = i; window.chap = chap;
+      page=0; reader.innerHTML='';
+      const path = spine[i];
+      const html = await (await fetch(`${BASE}/${path}`)).text();
+      const doc = new DOMParser().parseFromString(html,'application/xhtml+xml');
+      doc.querySelectorAll('img').forEach(img=>{
+        const src = img.getAttribute('src');
+        if(src && !/^(https?:|data:|\/)/.test(src))
+          img.src = new URL(src, `${BASE}/${path}`).href;
+      });
+      const wrap = document.createElement('div');
+      wrap.className='chapter-wrapper';
+      Array.from(doc.body.childNodes).forEach(n=>wrap.appendChild(document.importNode(n,true)));
+      reader.appendChild(wrap);
+
+      
+
+      // Strip TOC links (only for actual TOC/contents chapters)
+      try {
+        const isTOC = /(?:^|\/)(?:toc|contents)\.(?:x?html|xml)$/i.test(path) ||
+                      !!doc.querySelector('nav[role="doc-toc"], nav[epub\\:type~="toc"], nav#toc, nav.toc, #toc, .toc');
+        if (isTOC) {
+          wrap.querySelectorAll('a').forEach(link => {
+            const span = document.createElement('span');
+            span.innerHTML = link.innerHTML; // keep inner formatting
+            // preserve classes and inline styles so layout stays intact
+            span.className = link.className;
+            span.style.cssText = link.style.cssText;
+            link.replaceWith(span);
+          });
+          console.log('ℹ️ TOC links stripped for', path);
+        }
+      } catch(err) {
+        console.warn('TOC link strip failed:', err);
+      }
+
+// Hide broken images in this chapter without touching pagination
+      (function(container){
+        if (!container) return;
+        // future errors
+        container.querySelectorAll('img').forEach(img => {
+          if (!img.getAttribute('onerror')) img.setAttribute('onerror', "this.style.display='none'");
+          // already failed before we wired handlers
+          if (img.complete && img.naturalWidth === 0) img.style.display = 'none';
+        });
+        // inline SVG <image> check
+        container.querySelectorAll('svg image').forEach(node => {
+          const href = node.getAttribute('href') || node.getAttributeNS('http://www.w3.org/1999/xlink','href') || '';
+          if (!href || /^data:|^blob:|^[a-z]+:\/\//i.test(href)) return;
+          const test = new Image();
+          test.onerror = () => { node.style.display = 'none'; };
+          test.onload  = () => { if ((test.naturalWidth|0) === 0) node.remove(); };
+          test.src = href;
+        });
+      })(wrap);
+
+      await new Promise(r=>requestAnimationFrame(r));
+      relayout();
+      await loadHighlightsForChapter(i);
+      if(startAt==='end') gotoPage(total-1,false);
+      else await saveReadingProgress(chap,0);
+
+      // Re-apply vertical specifics if currently vertical
+      if (document.body.classList.contains('vertical-mode') && window.__setVerticalMode) {
+        window.__setVerticalMode(true);
+        // Ensure scroll at top
+        reader.scrollTop = 0;
+      }
+
+      // Update TOC highlight if open
+      const tocListEl = document.getElementById('toc-list');
+      if (tocListEl && tocListEl.children.length) {
+        Array.from(tocListEl.children).forEach(li=>{
+          li.classList.toggle('current', parseInt(li.dataset.spineIndex,10) === chap);
+        });
+      }
+      
+      // Ensure last page isn't skipped by adding invisible spacer
+      const spacer = document.createElement('div');
+      spacer.style.height = '1px';
+      spacer.style.breakAfter = 'column';
+      spacer.style.webkitColumnBreakAfter = 'always';
+      wrap.appendChild(spacer);
+
+      document.dispatchEvent(new Event('chapter:changed'));
+    }
+
+    function next(){
+  if(window.SWIPE_DISABLED) return;
+      if(page < total-1) gotoPage(page+1);
+      else if(chap < spine.length-1) loadChapter(chap+1,'start');
+    }
+    function prev(){
+  if(window.SWIPE_DISABLED) return;
+      if(page > 0) gotoPage(page-1);
+      else if(chap > 0) loadChapter(chap-1,'end');
+    }
+
+    let ignoreClick=false;
+    reader.addEventListener('touchend', e=>{
+      if(document.body.classList.contains('highlight-mode') || document.body.classList.contains('vertical-mode')) return;
+      ignoreClick=true; setTimeout(()=>ignoreClick=false,400);
+      const t=e.changedTouches[0];
+      const { left,width } = reader.getBoundingClientRect();
+      const x = t.clientX - left;
+      if(x < width*0.33) prev(); else if(x > width*0.67) next();
+    });
+    reader.addEventListener('click', e=>{
+      if(ignoreClick) return;
+      if(document.body.classList.contains('highlight-mode') || document.body.classList.contains('vertical-mode')) return;
+      const { left,width } = reader.getBoundingClientRect();
+      const x = e.clientX - left;
+      if(x < width*0.33) prev(); else if(x > width*0.67) next();
+    });
+
+    window.addEventListener('keydown', e=>{
+      if(document.body.classList.contains('highlight-mode')) return;
+      if(e.key==='ArrowLeft') prev();
+      if(e.key==='ArrowRight') next();
+    });
+
+    window.addEventListener('resize', relayout);
+
+    function grabContext(fullText, selectedText){
+  if(window.SWIPE_DISABLED) return;
+      const idx = fullText.indexOf(selectedText);
+      if(idx === -1) return { before:"", after:"" };
+      const w = 120;
+      return {
+        before: fullText.slice(Math.max(0, idx - w), idx),
+        after:  fullText.slice(idx + selectedText.length, idx + selectedText.length + w)
+      };
+    }
+
+    async function insertHighlight(row){
+  if(window.SWIPE_DISABLED) return;
+      const { data, error } = await window.supabase.from('highlights').insert(row).select().single();
+      if(error){ console.error("insert highlight error", error); return null; }
+      return data;
+    }
+
+    async function loadHighlightsForChapter(chapterIndex){
+  if(window.SWIPE_DISABLED) return;
+      if(!userId || !bookId) return;
+      const { data, error } = await window.supabase.from('highlights')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('book_id', bookId)
+        .eq('chapter_index', chapterIndex);
+      if(error){ console.error("fetch highlights error", error); return; }
+      const container = reader.querySelector('.chapter-wrapper');
+      if(!container) return;
+      data.forEach(row=>{
+        if(!row.text) return;
+        if(container.querySelector(`[data-db-id="${row.id}"]`)) return;
+        const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
+        let foundNode=null, offset=0;
+        while(walker.nextNode()){
+          const n = walker.currentNode;
+          const idx = n.data.indexOf(row.text);
+          if(idx !== -1){ foundNode=n; offset=idx; break; }
+        }
+        if(foundNode){
+          const span = document.createElement('span');
+          span.className='user-highlight';
+          span.textContent = row.text;
+          span.dataset.dbId = row.id;
+          span.dataset.text = row.text;
+          span.dataset.note = row.note || '';
+          const before = foundNode.data.slice(0, offset);
+          const after = foundNode.data.slice(offset + row.text.length);
+          const parent = foundNode.parentNode;
+          if(before) parent.insertBefore(document.createTextNode(before), foundNode);
+          parent.insertBefore(span, foundNode);
+          if(after) parent.insertBefore(document.createTextNode(after), foundNode);
+          parent.removeChild(foundNode);
+        }
+      });
+    }
+
+    hlBtn.onclick = ()=> highlightModule.toggleMode();
+
+    highlightModule.on('created', async ({ localId, text, elements })=>{
+      if(!text) return;
+      const fullChapterText = reader.textContent || '';
+      const ctx = grabContext(fullChapterText, text);
+      const row = {
+        chapter_index: chap,
+        user_id: userId,
+        reader_id: userId,
+        book_id: bookId,
+        book_slug: slug,
+        chapter_index: chap,
+        chapter: spine[chap] || null,
+        chapter_path: spine[chap] || null,
+        page_number: page+1,
+        text,
+        note: '',
+        color: 'blue',
+        before_context: ctx.before,
+        after_context: ctx.after,
+        cfi: null,
+        cfi_range: null,
+        emotion: null,
+        is_arc: false
+      };
+      const saved = await insertHighlight(row);
+      if(saved){
+        elements.forEach(el=>{
+          el.dataset.dbId = saved.id;
+          el.dataset.text = saved.text;
+          el.dataset.note = '';
+        });
+        openModal(saved);
+      }
+    });
+
+    reader.addEventListener('click', e=>{
+      const span = e.target.closest('.user-highlight');
+      if(!span) return;
+      if(document.body.classList.contains('highlight-mode')) return;
+      const dbId = span.dataset.dbId;
+      if(!dbId) return;
+      openModal({
+        id: dbId,
+        text: span.dataset.text || span.textContent,
+        note: span.dataset.note || ''
+      });
+      e.stopPropagation();
+      e.preventDefault();
+    }, true);
+
+    (async()=>{
+      let { data:{ session } } = await window.supabase.auth.getSession();
+      setLED(!!session);
+      if(!session){
+        if (loginScreen) loginScreen.classList.add('active');
+      }else{
+        userId = session.user.id;
+        await initReader();
+      }
+      if (loginForm) loginForm.addEventListener('submit', async e=>{
+        e.preventDefault();
+        const { data, error } = await window.supabase.auth.signInWithPassword({ email: emailEl.value, password: passEl.value });
+        if(error){ alert('Login failed'); console.error(error); return; }
+        loginScreen.classList.remove('active');
+        userId = data.user.id;
+        await initReader();
+      });
+    })();
+
+    async function initReader(){
+  if(window.SWIPE_DISABLED) return;
+      slug = new URLSearchParams(location.search).get('book');
+      if(!slug) return alert('Missing ?book');
+      bookId = await fetchBookIdBySlug(slug);
+      window.bookId = bookId;
+      window.slug = slug;
+      BASE = `https://hrxkqvifqawrnpzokome.supabase.co/storage/v1/object/public/books/${encodeURIComponent(slug)}`;
+
+      const fm = await (await fetch(`${BASE}/filemap.json`)).json();
+      spine = [...(fm.extras||[]), ...fm.spine];
+      window.spine = spine;
+
+      buildChapterMeta();
+
+      await Promise.all((fm.assets||[]).filter(p=>p.endsWith('.css')).map(async p=>{
+        let css = await (await fetch(`${BASE}/${p}`)).text();
+        css = css.replace(/url\((['"]?)([^'")]+)\1\)/g,(_,q,rel)=>
+          /^https?:|^data:|^\//.test(rel)?`url(${rel})`:`url(${new URL(rel,`${BASE}/${p}`).href})`
+        );
+        document.head.appendChild(Object.assign(document.createElement('style'),{textContent:css}));
+      }));
+
+      let saved = null;
+for (const __v of [bookId, bookId.replace(/\+/g,' '), bookId.replace(/ /g,'+')]){
+  const { data, error } = await supabase
+    .from('reading_progress')
+    .select('chapter_index,page_number')
+    .eq('user_id', userId)
+    .eq('book_id', __v)
+
+  if (!error){ saved = data; break; }
+  console.warn('[InkWell] saved fetch failed for variant %o:', __v, error);
+}
+      const startChap = saved?.chapter_index ?? 0;
+      const startPage = saved?.page_number ?? 0;
+
+      highlightModule.setup({ viewer: reader });
+
+      document.body.classList.add('paginated-mode');
+      await loadChapter(startChap);
+      gotoPage(startPage,false);
+
+      
+
+      window.highlightModule.on('modechange', ({active})=>{
+        hlBtn.classList.toggle('active', active);
+      });
+
+      window.__adjustEmotionPadding && window.__adjustEmotionPadding();
+      applyFontSettings();
+
+      window.reader = reader;
+      window.chap = chap;
+      window.__chapterMeta = chapterMeta;
+      document.dispatchEvent(new Event('reader:ready'));
+    }
+// expose initReader globally for external callers
+window.initReader = initReader;
+
+
+    /* Expose functions for external scripts */
+    window.updateUI = updateUI;
+    window.relayout = relayout;
+    window.getDisplayChapterNumber = getDisplayChapterNumber;
+    window.gotoPage = gotoPage;
+    window.loadChapter = loadChapter;
+    window.nextPage = next;
+    window.prevPage = prev;
+  </script>
+<!-- emotion bar JS -->
+<!-- Dynamic padding for emotion bar -->
+<script>
+  
+window.verticalMode = new URLSearchParams(location.search).get('vert') === 'true';
+console.log(window.verticalMode ? '✅ Vertical mode enabled' : 'ℹ️ Horizontal mode');
+
+    (function(){
+      const reader = document.getElementById('reader');
+      const bar = document.getElementById('emotional-heatmap');
+      function applyPadding(){
+  if(window.SWIPE_DISABLED) return;
+        if (!bar || !reader) return;
+        const h = bar.getBoundingClientRect().height;
+        document.documentElement.setProperty?.('--emotion-bar-height', h + 'px');
+        document.documentElement.style.setProperty('--emotion-bar-height', h + 'px');
+        const extra = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--emotion-extra-gap')) || 20;
+        const safe  = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--safe-bottom')) || 0;
+        reader.style.paddingBottom = (h + extra + safe) + 'px';
+      }
+      window.__adjustEmotionPadding = applyPadding;
+      window.addEventListener('load', ()=> setTimeout(applyPadding, 60));
+      window.addEventListener('resize', applyPadding);
+      window.addEventListener('orientationchange', ()=> setTimeout(applyPadding, 200));
+      if (window.ResizeObserver){ new ResizeObserver(applyPadding).observe(bar); }
+      new MutationObserver(applyPadding).observe(reader,{childList:true});
+    })();
+  </script>
+<!-- Font Panel Logic -->
+<script>
+    (function(){
+      const panel = document.getElementById('font-panel');
+      const fontBtn = document.getElementById('font-btn');
+      const closeBtn = document.getElementById('close-font-panel');
+      const fontSel = document.getElementById('fp-font-family');
+      const sizeInput = document.getElementById('fp-font-size');
+      const sizeDisplay = document.getElementById('font-size-display');
+      const themeBtns = Array.from(document.querySelectorAll('.theme-swatch'));
+
+      const STORE_KEY = 'inkwell_font_settings_v1';
+      let settings = { family:"'Lora',serif", size:18, theme:'light' };
+      try {
+        const raw = localStorage.getItem(STORE_KEY);
+        if(raw) settings = Object.assign(settings, JSON.parse(raw));
+      } catch(e){}
+
+      function save(){
+  if(window.SWIPE_DISABLED) return;
+        localStorage.setItem(STORE_KEY, JSON.stringify(settings));
+      }
+
+      window.applyFontSettings = function applyFontSettings(){
+  if(window.SWIPE_DISABLED) return;
+        const reader = document.getElementById('reader');
+        if(reader) reader.style.fontFamily = settings.family;
+        document.documentElement.style.setProperty('--reader-font-size', settings.size + 'px');
+        document.body.classList.remove('theme-light','theme-dark','theme-sepia','theme-matcha');
+        document.body.classList.add('theme-' + settings.theme);
+        fontSel.value = settings.family;
+        sizeInput.value = settings.size;
+        sizeDisplay.textContent = settings.size;
+        themeBtns.forEach(b=>b.classList.toggle('active', b.dataset.theme===settings.theme));
+      };
+
+      function togglePanel(show){
+  if(window.SWIPE_DISABLED) return;
+        if(show == null) show = !panel.classList.contains('active');
+        panel.classList.toggle('active', show);
+        panel.setAttribute('aria-hidden', show?'false':'true');
+      }
+
+      fontBtn.addEventListener('click', ()=>togglePanel());
+      closeBtn.addEventListener('click', ()=>togglePanel(false));
+
+      fontSel.addEventListener('change', ()=>{
+        settings.family = fontSel.value;
+        save(); applyFontSettings();
+      });
+      sizeInput.addEventListener('input', ()=>{
+        settings.size = parseInt(sizeInput.value,10);
+        sizeDisplay.textContent = settings.size;
+        save(); applyFontSettings();
+      });
+      themeBtns.forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          settings.theme = btn.dataset.theme;
+          save(); applyFontSettings();
+        });
+      });
+
+      document.addEventListener('keydown', e=>{
+        if(e.key === 'Escape' && panel.classList.contains('active')) togglePanel(false);
+      });
+      document.addEventListener('mousedown', e=>{
+        if(panel.classList.contains('active') && !panel.contains(e.target) && !fontBtn.contains(e.target)){
+          togglePanel(false);
+        }
+      });
+
+      applyFontSettings();
+    })();
+  </script>
+<!-- Reading Mode toggle (Font Panel) -->
+<script>
+(function(){
+  const css = `
+#font-panel .fp-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px}
+#font-panel .fp-title{font:600 12px/1.2 Inter,system-ui,sans-serif;letter-spacing:.4px;text-transform:uppercase;opacity:.7}
+#font-panel .fp-sub{font:400 12px/1.2 Inter,system-ui,sans-serif;opacity:.75}
+.switch{position:relative;display:inline-block;width:50px;height:28px}
+.switch input{opacity:0;width:0;height:0}
+.switch .slider{position:absolute;inset:0;cursor:pointer;background:#d0d6df;border-radius:999px;transition:background .18s;box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}
+.switch .slider::before{content:"";position:absolute;height:22px;width:22px;left:3px;top:3px;background:#fff;border-radius:50%;transition:transform .18s,box-shadow .18s;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+.switch input:checked + .slider{background:#1f73c9}
+.switch input:checked + .slider::before{transform:translateX(22px)}
+body.theme-dark #font-panel .switch .slider{background:#3a3f46;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
+body.theme-dark #font-panel .switch input:checked + .slider{background:#1f73c9}
+`;
+  if (!document.getElementById('fp-toggle-style')) {
+    const s = document.createElement('style'); s.id='fp-toggle-style'; s.textContent = css; document.head.appendChild(s);
+  }
+  const isVertical = () => new URLSearchParams(location.search).get('vert') === 'true';
+  const setMode = (vertical) => {
+    const u = new URL(location.href);
+    u.searchParams.set('vert', vertical?'true':'false');
+    try {
+      if (window.__setVerticalMode) {
+        window.__setVerticalMode(!!vertical);
+        history.replaceState(null,'',u.toString());
+        return;
+      }
+    } catch {}
+    // Fallback: reload with new param
+    location.href = u.toString();
+  };
+  function install(){
+  if(window.SWIPE_DISABLED) return;
+    const panel = document.getElementById('font-panel'); if (!panel) return;
+    if (!panel.querySelector('#fp-vertical-toggle')) {
+      const row = document.createElement('div');
+      row.className = 'fp-row';
+      row.innerHTML = `
+        <div>
+          <div class="fp-title">Reading Mode</div>
+          <div class="fp-sub">Toggle vertical scrolling</div>
+        </div>
+        <label class="switch" title="Vertical scrolling">
+          <input type="checkbox" id="fp-vertical-toggle" />
+          <span class="slider"></span>
+        </label>`;
+      panel.appendChild(row);
+    }
+    const input = panel.querySelector('#fp-vertical-toggle');
+    input.checked = isVertical();
+    if (!input.__wired) { input.__wired = true; input.addEventListener('change', ()=> setMode(input.checked)); }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install); else install();
+  const fontBtn = document.getElementById('font-btn');
+  fontBtn && fontBtn.addEventListener('click', ()=> setTimeout(install, 50));
+  document.addEventListener('reader:ready', ()=> setTimeout(install, 50));
+})();
+</script>
+<!-- Orientation Toggle + Library Nav -->
+<script>
+    (function(){
+      const orientationBtn = document.getElementById('orientation-btn');
+      const libBtn = document.getElementById('library');
+      let vertical = new URLSearchParams(location.search).get('vert') === 'true';
+
+      function getReader(){
+  if(window.SWIPE_DISABLED) return;
+        return window.reader || document.getElementById('reader');
+      }
+
+      function updateOrientationIcon(){
+  if(window.SWIPE_DISABLED) return;
+        if (!orientationBtn) return;
+        const span = orientationBtn.querySelector('.material-symbols-outlined');
+        if(!span) return;
+        span.textContent = vertical ? 'swap_vert' : 'swap_horiz';
+        orientationBtn.title = vertical ? 'Switch to Horizontal' : 'Switch to Vertical';
+      }
+
+      function onVerticalScroll() {
+  if(window.SWIPE_DISABLED) return;
+        const r = getReader();
+        if(!r) return;
+        const vh = window.innerHeight || document.documentElement.clientHeight;
+        const y = r.scrollTop;
+        const approxPage = Math.max(0, Math.floor(y / (vh * 0.95)));
+        const totalApprox = Math.max(1, Math.ceil(r.scrollHeight / (vh * 0.95)));
+        let dispNum = (window.getDisplayChapterNumber ? window.getDisplayChapterNumber(window.chap) : (window.chap + 1));
+        let chapterPart;
+        if (window.displayChapterTotal && dispNum !== null) {
+          chapterPart = `Ch\u00A0${dispNum}/${window.displayChapterTotal}`;
+        } else if (window.displayChapterTotal && dispNum === null && window.numberedChapters && window.numberedChapters.length) {
+          chapterPart = `Ch\u00A0–/${window.displayChapterTotal}`;
+        } else {
+          chapterPart = `Ch\u00A0${(window.chap||0)+1}/${(window.spine?window.spine.length:1)}`;
+        }
+        const pageTxt = document.getElementById('page-indicator'); if(pageTxt) pageTxt.textContent = `${(dispNum ?? ((window.chap||0)+1))}⋮${approxPage+1}`;
+      }
+
+      function applyOrientation() {
+  if(window.SWIPE_DISABLED) return;
+        const r = getReader();
+        if(!r) return;
+        if (vertical) {
+          document.body.classList.add('vertical-mode');
+          document.body.classList.remove('paginated-mode');
+          r.style.overflowY = 'auto';
+          r.style.overflowX = 'hidden';
+          r.style.removeProperty('column-width');
+          r.removeEventListener('scroll', onVerticalScroll);
+          r.addEventListener('scroll', onVerticalScroll, { passive:true });
+          onVerticalScroll();
+        } else {
+          document.body.classList.remove('vertical-mode');
+          document.body.classList.add('paginated-mode');
+          r.removeEventListener('scroll', onVerticalScroll);
+          r.style.overflowY = 'hidden';
+          r.style.overflowX = 'scroll';
+          if(window.relayout) window.relayout();
+        }
+        updateOrientationIcon();
+      }
+
+      if (orientationBtn) { orientationBtn.addEventListener('click', () => {
+        const url = new URL(window.location.href);
+        const isVertical = url.searchParams.get('vert') === 'true';
+        url.searchParams.set('vert', isVertical ? 'false' : 'true');
+        window.location.href = url.toString();
+      }); }
+
+      document.addEventListener('reader:ready', ()=>{
+        applyOrientation();
+      });
+
+      if (libBtn) {
+        libBtn.addEventListener('click', ()=> {
+          window.location.href = 'library.html';
+        });
+      }
+
+      window.__setVerticalMode = v => { vertical = !!v; applyOrientation(); };
+    })();
+  </script>
+<!-- TOC Logic -->
+<script>
+    (function(){
+      const tocBtn   = document.getElementById('toc-btn');
+      const tocPanel = document.getElementById('toc-panel');
+      const tocClose = document.getElementById('toc-close');
+      const tocList  = document.getElementById('toc-list');
+      if(!tocBtn || !tocPanel) return;
+
+      function friendlyTitle(file){
+  if(window.SWIPE_DISABLED) return;
+        const base = file.split('/').pop().replace(/\.(xhtml|html|xml)$/i,'');
+        let title = base
+          .replace(/^((chapter|chap|ch)[-_ ]*)?/i,'')
+          .replace(/^[0-9]{1,3}[-_ ]*/,'')
+          .replace(/_/g,' ')
+          .replace(/-/g,' ')
+          .trim();
+        if(!title) title = base;
+        return title.charAt(0).toUpperCase() + title.slice(1);
+      }
+
+      function buildTOC(){
+  if(window.SWIPE_DISABLED) return;
+        if(!window.__chapterMeta || !window.__chapterMeta.length) return;
+        tocList.innerHTML = '';
+        window.__chapterMeta.forEach(meta=>{
+          const li = document.createElement('li');
+          const chNum = meta.chapterNumber;
+          li.textContent = (chNum !== null ? chNum + '. ' : '') + friendlyTitle(meta.file);
+          li.dataset.spineIndex = meta.spineIndex;
+          if(meta.spineIndex === window.chap) li.classList.add('current');
+          li.addEventListener('click', ()=>{
+            if(window.loadChapter){
+              window.loadChapter(meta.spineIndex,'start');
+            }
+            tocList.querySelectorAll('li.current').forEach(c=>c.classList.remove('current'));
+            li.classList.add('current');
+            toggleTOC(false);
+          });
+          tocList.appendChild(li);
+        });
+      }
+
+      function refreshHighlight(){
+  if(window.SWIPE_DISABLED) return;
+        if(!tocList.children.length) return;
+        Array.from(tocList.children).forEach(li=>{
+          li.classList.toggle('current', parseInt(li.dataset.spineIndex,10) === window.chap);
+        });
+      }
+
+      function toggleTOC(show){
+  if(window.SWIPE_DISABLED) return;
+        if(show == null) show = !tocPanel.classList.contains('active');
+        tocPanel.classList.toggle('active', show);
+        tocPanel.setAttribute('aria-hidden', show?'false':'true');
+        if(show){
+          if(!tocList.children.length) buildTOC();
+          else refreshHighlight();
+        }
+      }
+
+      tocBtn.addEventListener('click', ()=>toggleTOC());
+      tocClose.addEventListener('click', ()=>toggleTOC(false));
+      document.addEventListener('keydown', e=>{
+        if(e.key === 'Escape' && tocPanel.classList.contains('active')) toggleTOC(false);
+      });
+      document.addEventListener('mousedown', e=>{
+        if(tocPanel.classList.contains('active') &&
+           !tocPanel.contains(e.target) &&
+           !tocBtn.contains(e.target)) {
+          toggleTOC(false);
+        }
+      });
+      document.addEventListener('reader:ready', buildTOC);
+      document.addEventListener('chapter:changed', refreshHighlight);
+
+      window.__toggleTOC = toggleTOC;
+    })();
+  </script>
+<!-- Bar Logic -->
+
+<!-- Highlight Viewer Panel -->
+<style>
+  #highlight-panel {
+    position: fixed;
+    top: 60px;
+    right: 12px;
+    width: 300px;
+    max-width: 90vw;
+    max-height: calc(100dvh - 90px);
+    background: #ffffffee;
+    backdrop-filter: blur(10px);
+    border: 1px solid #cfcfcf;
+    border-radius: 14px;
+    padding: 14px 16px;
+    z-index: 450;
+    font-family: system-ui, -apple-system, Segoe UI, Inter, sans-serif;
+    box-shadow: 0 10px 34px -8px rgba(0,0,0,.35);
+    overflow-y: auto;
+    display: none;
+  }
+  #highlight-panel.active { display: block; }
+  #highlight-panel .highlight-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  #highlight-panel h4 {
+    margin: 0;
+    font: 600 14px/1.2 Inter,system-ui,sans-serif;
+    letter-spacing: .5px;
+    text-transform: uppercase;
+    opacity: .75;
+  }
+  #highlight-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    font-size: 13px;
+  }
+  #highlight-list li {
+    margin-bottom: 10px;
+    cursor: pointer;
+    padding: 6px 8px;
+    border-radius: 6px;
+    transition: background .15s;
+    background: #f3f3f3;
+  }
+  #highlight-list li:hover {
+    background: #e0e0e0;
+  }
+</style>
+<div aria-hidden="true" id="highlight-panel">
+<div class="highlight-header">
+<h4>My Highlights</h4>
+<button aria-label="Close highlights" id="highlight-close">×</button>
+</div>
+<div id="highlight-list"></div>
+</div>
+<style>
+  #highlight-panel {
+    position: fixed;
+    top: 60px;
+    right: 12px;
+    width: 300px;
+    max-width: 90vw;
+    max-height: calc(100dvh - 90px);
+    background: #ffffffee;
+    backdrop-filter: blur(10px);
+    border: 1px solid #cfcfcf;
+    border-radius: 14px;
+    padding: 14px 16px;
+    z-index: 450;
+    font-family: system-ui, -apple-system, Segoe UI, Inter, sans-serif;
+    box-shadow: 0 10px 34px -8px rgba(0,0,0,.35);
+    overflow-y: auto;
+    display: none;
+  }
+  #highlight-panel.active { display: block; }
+  #highlight-panel .highlight-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  #highlight-panel h4 {
+    margin: 0;
+    font: 600 14px/1.2 Inter,system-ui,sans-serif;
+    letter-spacing: .5px;
+    text-transform: uppercase;
+    opacity: .75;
+  }
+
+
+/* === Toolbar tightening + Quiet button usability (override) === */
+#toolbar, .toolbar, .top-toolbar {
+  /* pull button groups a bit toward center */
+  padding-left: 18px !important;
+  padding-right: 18px !important;
+}
+
+/* slightly reduce inter-button gaps */
+#toolbar .icon-btn, .toolbar .icon-btn, #toolbar button, .toolbar button, .top-toolbar button {
+  margin-left: 2px !important;
+  margin-right: 2px !important;
+}
+
+/* make quiet-mode button easier to tap without changing visual size too much */
+#quiet-btn, .btn-quiet, [data-action="quiet"], [aria-label="Quiet mode"] {
+  position: relative;
+  z-index: 100;
+  /* bigger hitbox */
+  padding: 10px 12px !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* in case swipe layers overlap, ensure the quiet control stays clickable */
+#quiet-btn *, .btn-quiet *, [data-action="quiet"] * {
+  pointer-events: none;
+}
+
+
+
+/* === Quiet Mode: larger tap zone & layering === */
+#quiet-btn, .btn-quiet, [data-action="quiet"], [aria-label="Quiet mode"], button[title="Quiet mode"] {
+  position: relative !important;
+  z-index: 1000 !important;
+  padding: 16px 18px !important;          /* bigger hit target */
+  min-width: 56px !important;
+  min-height: 56px !important;
+  margin-left: -4px !important;            /* keep spacing tight visually */
+  margin-right: -4px !important;
+  touch-action: manipulation !important;
+  -webkit-tap-highlight-color: transparent !important;
+  cursor: pointer !important;
+  user-select: none !important;
+}
+
+</style>
+<script>
+(function lockVerticalOnly() {
+  if(window.SWIPE_DISABLED) return;
+  if (window.matchMedia && document.body.classList.contains('vertical-mode')) {
+    document.documentElement.style.overflowX = 'hidden';
+    document.body.style.overflowX = 'hidden';
+
+    window.addEventListener('touchmove', function(e) {
+      if (Math.abs(e.touches[0].clientX - (e.lastX || 0)) > 20) {
+        e.preventDefault();
+      }
+      e.lastX = e.touches[0].clientX;
+    }, { passive: false });
+  }
+})();
+</script>
+<script>
+function insertEmotionLog(entry) {
+  if(window.SWIPE_DISABLED) return;
+  console.log('[Emotion] insertEmotionLog called with:', entry);
+  if (!entry.emotion) {
+    console.warn('[Emotion] No emotion to log.');
+    return;
+  }
+
+  window.supabase.from('highlights').insert([{
+    user_id: entry.user_id,
+    book_id: entry.book_id,
+    chapter_index: entry.chapter_index,
+    emotion: entry.emotion,
+    recorded_at: entry.timestamp
+  }])
+  .then(({ error, data }) => {
+    if (error) {
+      console.error('[Emotion] Supabase insert error:', error);
+    } else {
+      console.log('[Emotion] Emotion logged successfully:', data);
+    }
+  });
+}
+</script>
+<script type="module">
+</script>
+<script>
+function getSlugFromURL() {
+  if(window.SWIPE_DISABLED) return;
+  const url = new URL(window.location.href);
+  return url.searchParams.get("book");
+}
+
+function showFloatingEmoji(emotion) {
+  if(window.SWIPE_DISABLED) return;
+  const emoji = document.createElement('div');
+  emoji.textContent = emotion;
+  emoji.className = 'floating-emoji';
+  emoji.style.left = (window.innerWidth / 2) + 'px';
+  emoji.style.top = (window.innerHeight / 2) + 'px';
+  document.body.appendChild(emoji);
+  setTimeout(() => emoji.remove(), 1500);
+}
+</script>
+
+
+<script src="/js/highlights.js"></script><script>
+document.addEventListener("DOMContentLoaded", () => {
+  const viewer = document.getElementById("reader");
+  if (viewer && window.highlightModule) {
+    highlightModule.setup({ viewer });
+  } else {
+    console.error("HighlightModule not available");
+  }
+});
+</script><script src="/js/emotion.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  const loginScreen = document.getElementById('login-screen');
+  const emailInput = document.getElementById('login-email');
+  const loginButton = document.getElementById('login-button');
+  const loginMsg = document.getElementById('login-msg');
+
+  if (!window.supabase) {
+    console.error("Supabase not initialized.");
+    return;
+  }
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.user) {
+    if (loginScreen) loginScreen.style.display = "none";
+    return;
+  }
+
+  const url = new URL(window.location.href);
+  const access_token = url.searchParams.get("access_token");
+  const refresh_token = url.searchParams.get("refresh_token");
+  if (access_token && refresh_token) {
+    const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+    if (!error && loginScreen) {
+      loginScreen.style.display = "none";
+      return;
+    }
+  }
+
+  if (loginScreen) loginScreen.style.display = "flex";
+
+  if (loginButton) {
+    loginButton.addEventListener('click', async () => {
+      const email = emailInput?.value.trim();
+      if (!email) {
+        loginMsg.textContent = "Please enter a valid email.";
+        return;
+      }
+      loginMsg.textContent = "Sending magic link...";
+      const { error } = await supabase.auth.signInWithOtp({ email });
+      loginMsg.textContent = error ? ("Error: " + error.message) : "Check your email for the magic link.";
+    });
+  }
+});
+</script>
+
+<button onclick="toggleMode()" style="position:fixed;top:1em;right:1em;z-index:999;">Toggle Mode</button>
+<script>
+function toggleMode() {
+  if(window.SWIPE_DISABLED) return;
+  const url = new URL(window.location.href);
+  const isVertical = url.searchParams.get('vert') === 'true';
+  if (isVertical) {
+    url.searchParams.delete('vert');
+  } else {
+    url.searchParams.set('vert', 'true');
+  }
+  window.location.href = url.toString();
+}
+</script>
+
+<script>
+// Compute an approximate line-height for the chapter and set --lh (fallback to 1em)
+(function initLineHeightBump(){
+  if(window.SWIPE_DISABLED) return;
+  function compute() {
+  if(window.SWIPE_DISABLED) return;
+    const wrap = document.querySelector('#reader .chapter-wrapper');
+    if (!wrap) return;
+    const probe = document.createElement('span');
+    probe.textContent = 'A\nA';
+    probe.style.whiteSpace = 'pre-wrap';
+    probe.style.visibility = 'hidden';
+    probe.style.position = 'absolute';
+    wrap.appendChild(probe);
+    const lh = probe.getBoundingClientRect().height / 2; // approx
+    wrap.removeChild(probe);
+    if (lh && isFinite(lh)) {
+      document.documentElement.style.setProperty('--lh', lh + 'px');
+    }
+  }
+  document.addEventListener('chapter:changed', () => setTimeout(compute, 50));
+  document.addEventListener('reader:ready', () => setTimeout(compute, 50));
+  window.addEventListener('resize', () => setTimeout(compute, 100));
+})();
+</script>
+
+<script>
+/* Quiet Mode — Brown Noise with gentle fade (iOS-friendly) [QUIET-MODE-1754621504] */
+(function(){
+  const BTN_ID = 'quiet-btn';
+  const STORAGE_KEY = 'inkwell_quiet_mode_v1';
+  let ctx, gain, src, running = false;
+
+  async function ensureContext(){
+  if(window.SWIPE_DISABLED) return;
+    if (ctx) return ctx;
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    gain = ctx.createGain();
+    gain.gain.value = 0;
+    gain.connect(ctx.destination);
+
+    if (ctx.audioWorklet && ctx.audioWorklet.addModule) {
+      const workletCode = `
+        class BrownNoiseProcessor extends AudioWorkletProcessor {
+          constructor(){ super(); this.lastOut = 0; }
+          process(inputs, outputs){ 
+            const out = outputs[0][0]; 
+            for (let i=0;i<out.length;i++){ 
+              const white = Math.random()*2-1; 
+              this.lastOut = (this.lastOut + (0.02*white)) / 1.02; 
+              out[i] = this.lastOut * 3.5; 
+            } 
+            return true; 
+          }
+        }
+        registerProcessor('brown-noise', BrownNoiseProcessor);
+      `;
+      const blob = new Blob([workletCode], {type:'application/javascript'});
+      const url = URL.createObjectURL(blob);
+      await ctx.audioWorklet.addModule(url);
+      src = new AudioWorkletNode(ctx, 'brown-noise');
+      src.connect(gain);
+    } else {
+      const node = ctx.createScriptProcessor(4096, 1, 1);
+      let lastOut = 0;
+      node.onaudioprocess = e => {
+        const out = e.outputBuffer.getChannelData(0);
+        for (let i=0; i<out.length; i++) {
+          const white = Math.random()*2-1;
+          lastOut = (lastOut + 0.02*white)/1.02;
+          out[i] = lastOut * 3.5;
+        }
+      };
+      node.connect(gain);
+      src = node;
+    }
+    return ctx;
+  }
+
+  function fadeTo(target = 0.2, ms = 400){
+  if(window.SWIPE_DISABLED) return;
+    if (!gain) return;
+    const now = ctx.currentTime;
+    const current = gain.gain.value;
+    gain.gain.cancelScheduledValues(now);
+    gain.gain.setValueAtTime(current, now);
+    gain.gain.linearRampToValueAtTime(target, now + ms/1000);
+  }
+
+  async function start(){
+  if(window.SWIPE_DISABLED) return;
+    await ensureContext();
+    if (ctx.state === 'suspended') await ctx.resume();
+    fadeTo(0.20, 400);
+    running = true;
+    localStorage.setItem(STORAGE_KEY, 'on');
+    updateButton(true);
+    console.info('[InkWell] quiet ON');
+  }
+
+  async function stop(){
+  if(window.SWIPE_DISABLED) return;
+    if (!ctx) return;
+    fadeTo(0.0, 250);
+    running = false;
+    localStorage.setItem(STORAGE_KEY, 'off');
+    updateButton(false);
+    console.info('[InkWell] quiet OFF');
+  }
+
+  function toggle(){
+  if(window.SWIPE_DISABLED) return; running ? stop() : start(); }
+
+  function updateButton(active){
+  if(window.SWIPE_DISABLED) return;
+    const btn = document.getElementById(BTN_ID);
+    if (!btn) return;
+    btn.classList.toggle('active', !!active);
+    btn.title = active ? 'Quiet mode is ON' : 'Quiet mode (brown noise)';
+  }
+
+  document.addEventListener('DOMContentLoaded', ()=>{
+    const btn = document.getElementById(BTN_ID);
+    if (!btn) return;
+    btn.addEventListener('click', toggle, { passive: true });
+    const last = localStorage.getItem(STORAGE_KEY);
+    if (last === 'on') updateButton(true);
+  });
+
+  window.__quiet = { start, stop, toggle };
+})();
+</script>
+
+<script>console.info('[InkWell] QUIET-MODE-1754621504 injected');</script>
+
+<script>
+function waitForSupabase() {
+  if(window.SWIPE_DISABLED) return;
+  if (typeof supabase !== 'undefined' || typeof sb !== 'undefined') {
+    console.log('[InkWell] Supabase client detected, starting reader...');
+    if (typeof initReader === 'function') {
+      initReader();
+    } else {
+      console.warn('[InkWell] initReader() not found');
+    }
+  } else {
+    console.log('[InkWell] Waiting for Supabase...');
+    setTimeout(waitForSupabase, 100);
+  }
+}
+document.addEventListener('DOMContentLoaded', waitForSupabase);
+</script>
+
+
+<!-- Transient floating button -->
+
+
+
+
+
+<!-- Transient floating button -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- Swipe Direction Override (SWIPE-ONLY; taps unaffected) -->
+<script>
+(function(){
+  // We only handle *swipes* here. Click/tap zones are not touched.
+  function isHorizontalMode(){
+  if(window.SWIPE_DISABLED) return;
+    return document.body.classList.contains('paginated-mode') &&
+           !document.body.classList.contains('vertical-mode');
+  }
+
+  // Helper wrappers to call whichever paging API exists
+  function call(fn){
+  if(window.SWIPE_DISABLED) return; try { if (typeof fn === 'function') { fn(); return true; } } catch(e){} return false; }
+  function goNext(){
+  if(window.SWIPE_DISABLED) return; // visually move RIGHT / forward
+    return call(window.nextPage) || call(window.next) || call(window.goNext) ||
+           (typeof window.turnPage === 'function' && (window.turnPage(1), true)) ||
+           call(window.pageNext) || call(window.advancePage);
+  }
+  function goPrev(){
+  if(window.SWIPE_DISABLED) return; // visually move LEFT / back
+    return call(window.prevPage) || call(window.prev) || call(window.goPrev) ||
+           (typeof window.turnPage === 'function' && (window.turnPage(-1), true)) ||
+           call(window.pagePrev) || call(window.backPage);
+  }
+
+  let sx=null, sy=null, st=null;
+  const EDGE = 24; // let OS/back gestures live near edges
+  const SWIPE_THRESHOLD_PX = 42;
+  const SWIPE_MIN_VELOCITY = 0.25; // px/ms (~250 px/s)
+
+  document.addEventListener('touchstart', function(e){
+    if (!isHorizontalMode() || e.touches.length !== 1) return;
+    const t = e.touches[0];
+    sx = t.clientX; sy = t.clientY; st = Date.now();
+  }, { passive: true, capture: true });
+
+  document.addEventListener('touchend', function(e){
+    if (!isHorizontalMode() || sx == null) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - sx;
+    const dy = t.clientY - sy;
+    const dt = Math.max(1, Date.now() - st);
+    const absX = Math.abs(dx), absY = Math.abs(dy);
+    const velocityX = absX / dt;
+
+    // Reset for next gesture
+    sx = sy = st = null;
+
+    // If this wasn't a horizontal *swipe*, do nothing—let taps/clicks bubble.
+    if (absX < absY) return;
+    if ((absX < SWIPE_THRESHOLD_PX) && (velocityX < SWIPE_MIN_VELOCITY)) return;
+
+    // Respect OS edge gestures
+    if ((dx > 0 && t.clientX <= EDGE) || (dx < 0 && t.clientX >= (window.innerWidth - EDGE))) return;
+
+    // REVERSED SWIPE MAPPING (taps unaffected):
+    // swipe LEFT (dx<0)  -> goNext()  (move right / forward)
+    // swipe RIGHT (dx>0) -> goPrev()  (move left  / back)
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    e.stopPropagation();
+    if (dx < 0) {
+      goNext();
+    } else if (dx > 0) {
+      goPrev();
+    }
+  }, { passive: false, capture: true });
+})();
+</script>
+
+<script>
+(function(){
+  // Find the quiet-mode button via a few likely selectors
+  const candidates = [
+    document.getElementById('quiet-btn'),
+    document.querySelector('.btn-quiet'),
+    document.querySelector('[data-action="quiet"]'),
+    document.querySelector('[aria-label="Quiet mode"]'),
+    document.querySelector('button[title="Quiet mode"]')
+  ].filter(Boolean);
+
+  const makeTapFriendly = (el) => {
+    if (!el) return;
+    el.style.touchAction = 'manipulation';
+    el.style.webkitTapHighlightColor = 'transparent';
+    el.style.position = el.style.position || 'relative';
+    el.style.zIndex = Math.max(100, parseInt(getComputedStyle(el).zIndex||'0',10)) + '';
+
+    // Avoid stacking duplicate listeners
+    if (!el.dataset.tapReady) {
+      // Convert quick touches into clicks and stop swipe handlers behind it from stealing the gesture
+      const forward = (e) => {
+        try { e.preventDefault(); e.stopPropagation(); } catch {}
+        // Trigger the click reliably
+        if (typeof el.click === 'function') el.click();
+      };
+      el.addEventListener('touchend', forward, { passive: false });
+      el.addEventListener('pointerup', forward, { passive: false });
+      el.dataset.tapReady = '1';
+    }
+  };
+
+  candidates.forEach(makeTapFriendly);
+})();
+</script>
+
+
+<script>
+(function(){
+  const el = document.querySelector('#quiet-btn, .btn-quiet, [data-action="quiet"], [aria-label="Quiet mode"], button[title="Quiet mode"]');
+  if (!el) return;
+  // Stop any previously added touchend/pointerup forwarders on this element from firing (capture-phase),
+  // but DO NOT preventDefault so the native click still happens and the existing toggle logic works.
+  const killForwarder = (e) => { try { e.stopImmediatePropagation(); } catch(e){} };
+  el.addEventListener('touchend', killForwarder, { capture: true, passive: false });
+  el.addEventListener('pointerup', killForwarder, { capture: true, passive: false });
+
+  // Accessibility: allow Space/Enter to toggle
+  if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '0');
+  el.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); }
+  });
+})();
+</script>
+
+
+<script id="inkwell_auth_led">
+(function(){
+  const dot = document.getElementById('status-dot');
+  if(!dot) return;
+  function setLED(ok){
+  if(window.SWIPE_DISABLED) return; dot.style.background = ok ? '#08c769' : '#d40000'; }
+  async function apply(){
+  if(window.SWIPE_DISABLED) return;
+    try{
+      const client = window.supabase || window.sb;
+      const { data:{ session } = {session:null} } = await client.auth.getSession();
+      setLED(!!session);
+    }catch(e){ setLED(false); }
+  }
+  document.addEventListener('supabase:ready', apply);
+  document.addEventListener('reader:ready', apply);
+  setTimeout(apply, 500);
+})();
+</script>
+
+
+
+
+
+<script id="highlight-mode-swipe-disable-hammer">
+(function(){
+  const hlBtn = document.getElementById('toggle-highlight');
+  const swipeL = document.getElementById('swipe-left');
+  const swipeR = document.getElementById('swipe-right');
+  let hammerInstances = [];
+
+  function disableSwipe(){
+  if(window.SWIPE_DISABLED) return;
+    hammerInstances.forEach(h => h.destroy && h.destroy());
+    hammerInstances = [];
+  }
+
+  function enableSwipe(){
+  if(window.SWIPE_DISABLED) return;
+    if(swipeL){
+      const hammL = new Hammer(swipeL);
+      hammL.on('swiperight', () => { swipeL.click(); });
+      hammerInstances.push(hammL);
+    }
+    if(swipeR){
+      const hammR = new Hammer(swipeR);
+      hammR.on('swipeleft', () => { swipeR.click(); });
+      hammerInstances.push(hammR);
+    }
+  }
+
+  if(hlBtn){
+    hlBtn.addEventListener('click', () => {
+      const isActive = hlBtn.classList.contains('active');
+      if(isActive){
+        // turn ON highlight mode -> disable swipe
+        disableSwipe();
+        if(swipeL) swipeL.style.display = 'none';
+        if(swipeR) swipeR.style.display = 'none';
+      } else {
+        // turn OFF highlight mode -> enable swipe
+        if(swipeL) swipeL.style.display = '';
+        if(swipeR) swipeR.style.display = '';
+        enableSwipe();
+      }
+    });
+  }
+
+  // initial enable
+  enableSwipe();
+})();
+</script>
+
+
+<script id="highlight-mode-global-swipe-disable">
+(function(){
+  window.SWIPE_DISABLED = false;
+  const hlBtn = document.getElementById('toggle-highlight');
+  if(hlBtn){
+    hlBtn.addEventListener('click', () => {
+      const isActive = hlBtn.classList.contains('active');
+      if(isActive){
+        window.SWIPE_DISABLED = true;
+      } else {
+        window.SWIPE_DISABLED = false;
+      }
+    });
+  }
+})();
+</script>
+
+
+<script id="highlight-mode-disable-all-hammer">
+(function(){
+  window._INKWELL_HAMMERS = [];
+  // Patch Hammer initialization to track instances
+  const _Hammer = window.Hammer;
+  if(_Hammer){
+    window.Hammer = function(el, options){
+      const instance = new _Hammer(el, options);
+      window._INKWELL_HAMMERS.push({el: el, options: options, instance: instance});
+      return instance;
+    };
+    // Copy Hammer static props
+    for (let key in _Hammer) {
+      if (_Hammer.hasOwnProperty(key)) {
+        window.Hammer[key] = _Hammer[key];
+      }
+    }
+  }
+
+  const hlBtn = document.getElementById('toggle-highlight');
+  if(hlBtn){
+    hlBtn.addEventListener('click', () => {
+      const isActive = hlBtn.classList.contains('active');
+      if(isActive){
+        // Disable all Hammer instances
+        window._INKWELL_HAMMERS.forEach(h => {
+          try { h.instance.destroy(); } catch(e){}
+        });
+      } else {
+        // Re-enable all Hammer instances
+        const reinit = [];
+        window._INKWELL_HAMMERS.forEach(h => {
+          try {
+            const newInst = new _Hammer(h.el, h.options);
+            reinit.push({el: h.el, options: h.options, instance: newInst});
+          } catch(e){}
+        });
+        window._INKWELL_HAMMERS = reinit;
+      }
+    });
+  }
+})();
+</script>
+
+<script>
+// --- Highlight Mode Control ---
+window.INKWELL_HIGHLIGHT_MODE = false;
+
+function setHighlightMode(active) {
+  window.INKWELL_HIGHLIGHT_MODE = !!active;
+  console.log('[InkWell] Highlight mode', active ? 'ON' : 'OFF');
+  const btn = document.getElementById('highlight-btn');
+  if (btn) btn.classList.toggle('active', active);
+
+  if (typeof hammer !== 'undefined' && hammer) {
+    if (active) {
+      hammer.off('swipeleft');
+      hammer.off('swiperight');
+      hammer.off('tap');
+    } else {
+      hammer.on('swipeleft', goNextPage);
+      hammer.on('swiperight', goPrevPage);
+      hammer.on('tap', handleTapZone);
+    }
+  }
+}
+
+// Block touch events in highlight mode before Hammer.js sees them
+['touchstart','touchmove','touchend'].forEach(evt => {
+  document.addEventListener(evt, (e) => {
+    if (window.INKWELL_HIGHLIGHT_MODE) {
+      e.stopImmediatePropagation();
+    }
+  }, true);
+});
+
+const highlightBtn = document.getElementById('highlight-btn');
+if (highlightBtn) {
+  highlightBtn.addEventListener('click', () => {
+    setHighlightMode(!window.INKWELL_HIGHLIGHT_MODE);
+    if (window.INKWELL_HIGHLIGHT_MODE) {
+      if (typeof switchToDomMode === 'function') switchToDomMode();
+    } else {
+      if (typeof switchToRasterMode === 'function') switchToRasterMode();
+    }
+  });
+}
+</script>
+
+<script>
+// Global catcher: hide/remove any broken <img> anywhere (capture = true)
+document.addEventListener('error', function (e) {
+  const t = e.target;
+  if (t && t.tagName === 'IMG') {
+    // Remove to avoid layout jank in paginated mode
+    t.style.display = 'none';
+  }
+}, true);
+</script>
+
+<script id="toolbar-centered-cleanup">
+(function(){
+  const sels = ['#toolbar .separator', '#toolbar .sep', '#toolbar [role="separator"]', '#toolbar .divider'];
+  requestAnimationFrame(()=>{
+    for (const sel of sels) document.querySelectorAll(sel).forEach(n=>n.remove());
+  });
+})();
+</script>
+</body>
+
+<script>
+// Dynamically keep --toolbar-h in sync with actual toolbar height (safe for iOS browser chrome changes)
+(function(){
+  function setToolbarH(){
+  if(window.SWIPE_DISABLED) return;
+    var tb = document.getElementById('toolbar');
+    var h = tb ? tb.getBoundingClientRect().height : 50;
+    document.documentElement.style.setProperty('--toolbar-h', (h + 0) + 'px');
+  }
+  window.addEventListener('load', function(){ setTimeout(setToolbarH, 50); });
+  window.addEventListener('resize', function(){ setTimeout(setToolbarH, 100); });
+  window.addEventListener('orientationchange', function(){ setTimeout(setToolbarH, 200); });
+})();
+</script>
+
+
+<script>
+// Enable a safe vh polyfill only if 100dvh is not supported
+(function(){
+  var needPolyfill = !(window.CSS && CSS.supports && CSS.supports('height: 100dvh'));
+  if (needPolyfill) {
+    document.documentElement.classList.add('vh-polyfill');
+    function setVH(){
+  if(window.SWIPE_DISABLED) return;
+      var vh = window.innerHeight * 0.01;
+      document.documentElement.style.setProperty('--vh', vh + 'px');
+    }
+    window.addEventListener('load', function(){ setTimeout(setVH, 50); });
+    window.addEventListener('resize', function(){ setTimeout(setVH, 100); });
+    window.addEventListener('orientationchange', function(){ setTimeout(setVH, 200); });
+  }
+})();
+</script>
+
+
+<style id="toolbar-balance">
+#toolbar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 0;
+  padding-left: max(10px, env(safe-area-inset-left)); padding-right: max(10px, env(safe-area-inset-right)); height: 50px; box-sizing: border-box; }
+#toolbar .group { display: flex; align-items: center; }
+#toolbar-left { justify-content: flex-start; gap: 12px; }
+#toolbar-center { justify-content: center; gap: 14px; }
+#toolbar-right { justify-content: flex-end; gap: 12px; }
+#page-indicator { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 32vw; font-variant-numeric: tabular-nums; font-size: clamp(.72rem, 2.4vw, .9rem); }
+</style>
+
+
+<style id="highlight-mode-swipe-disable">
+#swipe-left.highlight-disabled,
+#swipe-right.highlight-disabled {
+    display: none !important;
+}
+</style>
+
+<style id="toolbar-centered-simple">
+/* Toolbar: centered icons, separators hidden */
+#toolbar {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important; /* use space-evenly if you want full-width distribution */
+  gap: 14px !important;
+  padding-left: max(10px, env(safe-area-inset-left));
+  padding-right: max(10px, env(safe-area-inset-right));
+  height: 50px;
+  box-sizing: border-box;
+}
+/* Flatten legacy left/center/right groups so icons become siblings */
+#toolbar .group,
+#toolbar-left, #toolbar-center, #toolbar-right {
+  display: contents !important;
+  justify-content: unset !important;
+  gap: 0 !important;
+}
+/* Hide any visual separators */
+#toolbar .separator,
+#toolbar .sep,
+#toolbar [role="separator"],
+#toolbar .divider {
+  display: none !important;
+}
+/* Optional: icon buttons look consistent */
+#toolbar button, #toolbar .btn, #toolbar .tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  min-height: 36px;
+  border: 0;
+  background: none;
+  padding: 4px;
+}
+</style>
+</head></html>
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
 <!-- INKWELL-BUILD: reader.fixed  -->
 <script type="module">
 import { supabase } from './js/supabase.js';
