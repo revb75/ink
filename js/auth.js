@@ -1,24 +1,33 @@
 // /js/auth.js
+// Auth utilities built on the singleton supabase client
+
 import { supabase } from './supabase.js';
 
-window.INKWELL_USER_ID = null;
-
-async function refreshUser() {
-  const { data: { session } } = await supabase.auth.getSession();
-  const id = session?.user?.id || null;
-  window.INKWELL_USER_ID = id;
-  return id;
+export async function getSession(){
+  const { data: { session }, error } = await supabase.auth.getSession();
+  if (error) console.error('[InkWell] getSession error:', error);
+  return session || null;
 }
 
-supabase.auth.onAuthStateChange((_evt, session) => {
-  window.INKWELL_USER_ID = session?.user?.id || null;
-});
+export async function getUser(){
+  const session = await getSession();
+  return session?.user || null;
+}
 
-export async function withUser(fn) {
-  const id = await refreshUser();
-  if (!id) {
-    location.href = '/index.html'; // force login
+// Helper: run a function only when a user is available (provides userId and user object)
+export async function withUser(fn){
+  const user = await getUser();
+  if (!user){
+    console.warn('❌ No session found – user not logged in');
     return;
   }
-  return fn(id);
+  try { await fn(user.id, user); }
+  catch (e) { console.error('[InkWell] withUser handler error:', e); }
+}
+
+// Optional: subscribe to auth state changes
+export function onAuthChange(cb){
+  return supabase.auth.onAuthStateChange((event, session) => {
+    try { cb?.(event, session); } catch(e){ console.error('onAuthChange cb error:', e); }
+  });
 }
