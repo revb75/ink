@@ -5,16 +5,123 @@
   <title>InkWell Library</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <!-- Fonts + Supabase -->
+  <!-- Fonts + Supabase (single client via CDN global) -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap" rel="stylesheet"/>
   <link href="https://fonts.googleapis.com/css2?family=Lora:wght@600&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
-  <script type="module" src="/js/supabase.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <!-- Your CSS styles (unchanged, but cleaned indentation) -->
+  <!-- Base styles -->
   <style>
-    /* Your CSS from original file goes here */
-    /* ... keep all style blocks exactly as in your working version ... */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Roboto', sans-serif;
+      background: #f9f9f9;
+      color: #333;
+      width: 100%;
+      min-height: 100vh;
+      display: block;
+      padding-top: 0;
+    }
+    a { color: #0066cc; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    h1 {
+      font-family: 'Lora', serif;
+      color: #222;
+      font-size: 2.25rem;
+      margin: 1rem auto;
+      text-align: center;
+    }
+
+    /* Header + hamburger */
+    header {
+      width: 100%;
+      position: relative;
+      padding: 1rem 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .menu-btn {
+      font-size: 1.5rem;
+      background: none;
+      border: none;
+      color: #333;
+      cursor: pointer;
+      position: absolute;
+      top: 1rem;
+      left: 1.5rem;
+      z-index: 1001;
+    }
+
+    /* Slide-in overlay nav */
+    .overlay{
+      position: fixed;
+      top: 0; right: 0;
+      width: 100vw; height: 100vh;
+      background: #ffffff;
+      padding: 2rem 1.25rem;
+      transform: translateX(100%) !important;   /* keep hidden by default */
+      transition: transform .3s ease-in-out;
+      z-index: 1000;
+      display: flex; flex-direction: column;
+    }
+    .overlay.show{ transform: translateX(0) !important; }
+    .overlay nav{
+      margin-top: 2rem;
+      display: flex; flex-direction: column; gap: 1rem;
+    }
+    .overlay a, .overlay button{
+      font-size: 1.1rem; font-weight: 500;
+      border: none; background: none;
+      padding: .75rem 1rem; text-align: left;
+      border-radius: 6px; color: #333; cursor: pointer;
+      transition: background .2s, color .2s;
+      font-family: 'Roboto', sans-serif;
+    }
+    .overlay a:hover, .overlay button:hover{ background: #0066cc; color: #fff; }
+    .close-btn{
+      position: absolute; top: 1rem; right: 1rem;
+      font-size: 1.5rem; background: none; border: none; color: #333; cursor: pointer;
+    }
+
+    /* Filters */
+    #filters{
+      display: flex; justify-content: center; align-items: center;
+      gap: 8px; flex-wrap: wrap; width: 100%;
+      margin: 8px auto 14px; max-width: 1200px;
+      padding: 0 10px;
+    }
+    #filters select{
+      padding: 6px 10px; border: 1px solid #ddd; border-radius: 999px;
+      background: #fff; font-size: .9rem;
+    }
+
+    /* Library grid */
+    #library{
+      display: grid !important;
+      grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+      gap: 12px; align-items: start;
+      max-width: 1200px; margin: 0 auto 40px; padding: 0 10px;
+    }
+    @media (max-width:1024px){ #library{ grid-template-columns: repeat(auto-fill, minmax(150px,1fr)); } }
+    @media (max-width:768px){  #library{ grid-template-columns: repeat(auto-fill, minmax(130px,1fr)); } }
+    @media (max-width:480px){  #library{ grid-template-columns: repeat(auto-fill, minmax(110px,1fr)); } }
+
+    /* Cards */
+    .book{
+      display: flex; flex-direction: column;
+      background: #fff; border-radius: 12px; overflow: hidden;
+      box-shadow: 0 2px 10px rgba(0,0,0,.06);
+      transition: transform .15s ease, box-shadow .15s ease;
+    }
+    .book:hover{ transform: translateY(-2px); box-shadow: 0 8px 18px rgba(0,0,0,.08); }
+    .book a{ text-decoration: none; color: inherit; display: block; }
+    .book img{
+      width: 100% !important; height: auto !important;
+      aspect-ratio: 2 / 3; object-fit: cover; display: block;
+      background: #f1f1f1; border-bottom: 1px solid #eee;
+    }
+    .book p{ font-size: .82rem; color: #666; margin: 6px 10px 10px; }
   </style>
 </head>
 <body>
@@ -25,7 +132,7 @@
   <div class="overlay" id="overlayMenu">
     <button class="close-btn" onclick="toggleMenu()">✕</button>
     <nav>
-      <a href="/dashboard.html">Dashboard</a>
+      <a href="/index.html">Dashboard</a>
       <a href="/analytics.html">Analytics</a>
       <a href="/upload.html">Upload</a>
       <a href="/library.html">Library</a>
@@ -43,57 +150,63 @@
   <div id="library"></div>
 
   <script>
+    // Supabase (single client via CDN global)
     const SUPA_URL = 'https://hrxkqvifqawrnpzokome.supabase.co';
     const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhyeGtxdmlmcWF3cm5wem9rb21lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcxNzQ0MDIsImV4cCI6MjA2Mjc1MDQwMn0.UZVhGweJEQBxqtrp37G77YmAefQWZYDGzdk1lyj4ua4';
     const sb = supabase.createClient(SUPA_URL, SUPA_KEY, { auth: { persistSession: true } });
+
+    // Utils
+    function esc(s){ return String(s||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]); }
+
     let books = [];
 
-    function render(list) {
+    function render(list){
       const lib = document.getElementById('library');
       lib.innerHTML = '';
       list.forEach(b => {
         const d = document.createElement('div');
         d.className = 'book';
+        const href = b.slug ? `reader.html?book=${encodeURIComponent(b.slug)}` : '';
         d.innerHTML = `
-          ${b.slug ? `<a href="/reader.html?book=${b.slug}">` : ''}
-            <img src="${b.cover}" alt="${b.title} cover"/>
-          ${b.slug ? `</a>` : ''}
-          ${b.author ? `<p>${b.author}</p>` : ''}
-          <p>${b.mood || '–'}, ${b.length || '–'}, ${b.year || '–'}</p>
+          ${href ? `<a href="${href}">` : ''}
+            <img src="${esc(b.cover)}" alt="${esc(b.title)} cover" loading="lazy"/>
+          ${href ? `</a>` : ''}
+          ${b.author ? `<p>${esc(b.author)}</p>` : ''}
+          <p>${esc(b.mood || '–')}, ${esc(b.length || '–')}, ${esc(b.year || '–')}</p>
         `;
         lib.appendChild(d);
       });
     }
 
-    function populateFilters(list) {
+    function populateFilters(list){
       const gSel = document.getElementById('filter-genre');
       const ySel = document.getElementById('filter-year');
       const tSel = document.getElementById('filter-type');
-      const genres = [...new Set(list.map(b => b.mood))].sort();
-      const years  = [...new Set(list.map(b => b.year))].sort((a,b)=>a-b);
-      const types  = [...new Set(list.map(b => b.length))].sort();
+      const genres = [...new Set(list.map(b => b.mood).filter(Boolean))].sort();
+      const years  = [...new Set(list.map(b => b.year).filter(Boolean))].sort((a,b)=>a-b);
+      const types  = [...new Set(list.map(b => b.length).filter(Boolean))].sort();
       genres.forEach(g => gSel.add(new Option(g)));
       years.forEach(y => ySel.add(new Option(y)));
       types.forEach(t => tSel.add(new Option(t)));
       [gSel, ySel, tSel].forEach(sel => sel.addEventListener('change', applyFilters));
     }
 
-    function applyFilters() {
+    function applyFilters(){
       const g = document.getElementById('filter-genre').value;
       const y = document.getElementById('filter-year').value;
       const t = document.getElementById('filter-type').value;
       let out = books.slice();
       if (g !== 'All Genres') out = out.filter(b => b.mood === g);
-      if (y !== 'All Years')  out = out.filter(b => b.year == y);
+      if (y !== 'All Years')  out = out.filter(b => String(b.year) === String(y));
       if (t !== 'All Types')  out = out.filter(b => b.length === t);
       render(out);
     }
 
-    async function loadBooks() {
+    async function loadBooks(){
       const { data, error } = await sb.from('books').select('title,slug,genre,tags,upload_time');
-      if (error) return console.error('Error:', error);
-      books = data.map(b => ({
-        title: b.title,
+      if (error) { console.error('Error:', error); return; }
+      books = (data || []).map(b => ({
+        title: b.title || '',
         author: '',
         slug: b.slug,
         cover: `${SUPA_URL}/storage/v1/object/public/books/${b.slug}/OEBPS/images/cover-front.jpg`,
@@ -101,21 +214,26 @@
         length: Array.isArray(b.tags) && b.tags.length ? b.tags[0] : 'Unknown',
         year: b.upload_time ? new Date(b.upload_time).getFullYear() : ''
       }));
-      books.sort((a, b) => b.year - a.year);
+      books.sort((a,b) => (b.year||0)-(a.year||0));
       populateFilters(books);
       render(books);
     }
 
-    document.addEventListener('DOMContentLoaded', loadBooks);
+    document.addEventListener('DOMContentLoaded', () => {
+      // Ensure overlay starts closed
+      document.getElementById('overlayMenu')?.classList.remove('show');
+      loadBooks();
+    });
 
-    // Nav + logout
+    // Global nav helpers
     window.toggleMenu = function(){
       const el = document.getElementById('overlayMenu');
       if (el) el.classList.toggle('show');
     };
-    window.logout = function(){
-      try { if (typeof supabase !== 'undefined') supabase.auth.signOut(); } catch(e) {}
+    window.logout = async function(){
+      try { await sb.auth.signOut(); } catch(e) {}
       alert('Logging out...');
+      location.href = 'index.html';
     };
   </script>
 </body>
