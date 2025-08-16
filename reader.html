@@ -587,7 +587,6 @@ a[class*="next"][class*="chapter"] {
 <span class="material-symbols-outlined">format_list_numbered</span>
 </button>
 <span id="page-indicator">Ch3 Pg4</span>
-
 </div>
 </div>
 <!-- font panel -->
@@ -628,7 +627,7 @@ a[class*="next"][class*="chapter"] {
 <ol id="toc-list"></ol>
 </div>
 <!-- reader -->
-<div id="reader"></div><button aria-label="Next" id="next-chapter-btn" type="button">Next</button>
+<div id="reader"></div>
 <div class="edge-shield left"></div>
 <div class="edge-shield right"></div>
 <!-- emotion bar -->
@@ -2457,113 +2456,7 @@ document.addEventListener('error', function (e) {
   window.InkWellNextFab = { show: showFab, hide: hideFab, rearm: onScroll };
 })();
 </script>
-<script>
-(function NextFabInstall(){
-  const log = (...a) => console.log("[NextFAB]", ...a);
-
-  function isVertical(){
-    try {
-      if (window.ReaderState && typeof window.ReaderState.getMode === 'function') {
-        return window.ReaderState.getMode() === 'vertical';
-      }
-    } catch {}
-    const url = new URL(location.href);
-    const p = url.searchParams.get('vert');
-    if (p === 'true') return true;
-    if (p === 'false') return false;
-    return (localStorage.getItem('InkWell:isVertical') === 'true');
-  }
-
-  function ensureSentinel(){
-    const reader = document.getElementById('reader');
-    if (!reader) return null;
-    let s = document.getElementById('inkwell-bottom-sentinel');
-    if (!s) {
-      s = document.createElement('div');
-      s.id = 'inkwell-bottom-sentinel';
-      s.style.height = '1px';
-      reader.appendChild(s);
-    } else if (s.parentElement !== reader) {
-      reader.appendChild(s);
-    }
-    return s;
-  }
-
-  function advanceChapter(){
-    // Prefer host-provided next/nextChapter; otherwise load next spine index
-    if (typeof window.nextChapter === 'function') return window.nextChapter();
-    if (typeof window.goToNextChapter === 'function') return window.goToNextChapter();
-    if (typeof window.next === 'function') return window.next(); // may handle chapter overflow in some builds
-    if (typeof window.loadChapter === 'function' && Number.isFinite(window.chap) && Array.isArray(window.spine)) {
-      const nextIdx = Math.min((window.chap|0) + 1, (window.spine.length|0) - 1);
-      if (nextIdx > (window.chap|0)) return window.loadChapter(nextIdx, 'start');
-    }
-    // Fallback: broadcast for app to handle
-    document.dispatchEvent(new CustomEvent('inkwell:next-chapter', { bubbles: true }));
-    log("Dispatched inkwell:next-chapter (no known function found).");
-  }
-
-  function wireButton(){
-    const btn = document.getElementById('next-chapter-btn');
-    if (!btn) return;
-
-    // Always enforce professional label
-    btn.textContent = "Next";
-    btn.setAttribute('aria-label', 'Next');
-
-    // Click -> advance
-    btn.onclick = advanceChapter;
-  }
-
-  let io;
-  function observeBottom(){
-    const btn = document.getElementById('next-chapter-btn');
-    const reader = document.getElementById('reader');
-    if (!btn || !reader) return;
-
-    const sentinel = ensureSentinel();
-    if (!sentinel) return;
-
-    if (io) try { io.disconnect(); } catch {}
-
-    io = new IntersectionObserver((entries) => {
-      const e = entries[0];
-      if (e && e.isIntersecting) {
-        btn.classList.add('show');
-      } else {
-        btn.classList.remove('show');
-      }
-    }, { root: reader, rootMargin: '320px 0px 0px 0px', threshold: 0 });
-
-    io.observe(sentinel);
-  }
-
-  function install(){
-    wireButton();
-    if (!isVertical()) {
-      // Hide and bail in horizontal mode
-      const btn = document.getElementById('next-chapter-btn');
-      if (btn) btn.classList.remove('show');
-      log("Hidden (horizontal mode).");
-      return;
-    }
-    document.body.classList.add('vertical-mode'); // ensure CSS guards apply
-    observeBottom();
-    log("Ready in vertical mode.");
-  }
-
-  // Re-arm when the reader declares readiness and on chapter changes
-  document.addEventListener('reader:ready', () => setTimeout(install, 0));
-  document.addEventListener('chapter:changed', () => setTimeout(observeBottom, 50));
-
-  // As a fallback, try once on DOMContentLoaded
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => setTimeout(install, 50));
-  } else {
-    setTimeout(install, 50);
-  }
-})();
-</script></body>
+</body>
 <script>
 // Dynamically keep --toolbar-h in sync with actual toolbar height (safe for iOS browser chrome changes)
 (function(){
@@ -2680,4 +2573,12 @@ document.addEventListener('error', function (e) {
 <style>
 /* Disable side tap zones in vertical mode so clicks aren't intercepted */
 body.vertical-mode .edge-shield { display: none !important; pointer-events: none !important; }
+</style><style>
+/* Kill-switch: hide any bottom "Next" FAB that may be injected by older scripts */
+#next-chapter-btn,
+.next-fab,
+[data-next-fab],
+button[aria-label="Next"].fab,
+button.next-fab,
+a.next-fab { display: none !important; visibility: hidden !important; pointer-events: none !important; }
 </style></head></html>
