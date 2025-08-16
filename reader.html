@@ -16,7 +16,11 @@ withUser(async (uid) => {
   let progress = null;
 const __variants = [bookId, bookId.replace(/\+/g,' '), bookId.replace(/ /g,'+')];
 for (const __v of __variants){
-  const { data, error } = await supabase.from('reading_progress').select('chapter_index,page_number').eq('user_id', uid).eq('book_id', __v)
+  const { data, error } = await supabase
+    .from('reading_progress')
+    .select('chapter_index,page_number')
+    .eq('user_id', uid)
+    .eq('book_id', __v)
 
   if (!error){ progress = data; break; }
   console.warn('[InkWell] progress fetch failed for variant %o:', __v, error);
@@ -1271,7 +1275,9 @@ if (error && error.code !== '409') console.error('Save progress failed', error);
 
       let saved = null;
 for (const __v of [bookId, bookId.replace(/\+/g,' '), bookId.replace(/ /g,'+')]){
-  const { data, error } = await supabaseawait supabase    .from('reading_progress')    .select('chapter_index,page_number')
+  const { data, error } = await supabase
+    .from('reading_progress')
+    .select('chapter_index,page_number')
     .eq('user_id', userId)
     .eq('book_id', __v)
 
@@ -2397,9 +2403,9 @@ function setHighlightMode(active) {
   }, true);
 });
 
-const HL_BTN = document.getElementById('highlight-btn');
-if (HL_BTN) {
-  HL_BTN.addEventListener('click', () => {
+const highlightBtn = document.getElementById('highlight-btn');
+if (highlightBtn) {
+  highlightBtn.addEventListener('click', () => {
     setHighlightMode(!window.INKWELL_HIGHLIGHT_MODE);
     if (window.INKWELL_HIGHLIGHT_MODE) {
       if (typeof switchToDomMode === 'function') switchToDomMode();
