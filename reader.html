@@ -588,7 +588,7 @@ a[class*="next"][class*="chapter"] {
 </button>
 <span id="page-indicator">Ch3 Pg4</span>
 </div>
-</div>
+</div><div id="next-cta-bar"><button aria-label="Next" id="next-toolbar-btn" type="button">Next</button></div>
 <!-- font panel -->
 <div aria-hidden="true" id="font-panel">
 <button aria-label="Close font panel" id="close-font-panel">×</button>
@@ -2233,149 +2233,7 @@ document.addEventListener('error', function (e) {
   });
 })();
 </script>
-<script>
 
-// ================== InkWell Auto-Advance (Vertical Only) ==================
-(function(){
-  if (window.__INKWELL_AUTOADV_INSTALLED__) return;
-  window.__INKWELL_AUTOADV_INSTALLED__ = true;
-
-  // Detect vertical mode robustly
-  function isVerticalMode(){
-    try {
-      if (window.ReaderState?.getMode && window.ReaderState.getMode() === 'vertical') return true;
-      const url = new URL(window.location.href);
-      const vertParam = url.searchParams.get('vert');
-      if (vertParam === 'true') return true;
-      if (document.body.classList.contains('vertical-mode')) return true;
-      const persisted = localStorage.getItem('InkWell:isVertical');
-      return persisted === 'true';
-    } catch(e) { return false; }
-  }
-
-  // Find the best scroll container
-  function pickContainer(){
-    const order = [
-      '[data-chapter-container]',
-      '#chapter-container',
-      '#reader',
-      '#content',
-      'main',
-      'body'
-    ];
-    for (const sel of order){
-      const el = document.querySelector(sel);
-      if (el) return el;
-    }
-    return document.body;
-  }
-
-  // Advance strategy attempts
-  async function advanceChapter(){
-    console.log('[AutoAdvance] Bottom reached — advancing to next chapter…');
-    if (typeof window.nextChapter === 'function') { window.nextChapter(); return; }
-    if (typeof window.goToNextChapter === 'function') { window.goToNextChapter(); return; }
-    if (typeof window.loadChapter === 'function' && typeof window.currentChapterIndex === 'number'){
-      try { window.loadChapter(window.currentChapterIndex + 1); return; } catch {}
-    }
-    // Fallback event if host wants to hook it
-    window.dispatchEvent(new CustomEvent('inkwell:next-chapter'));
-  }
-
-  function attachAutoAdvance(){
-    if (!isVerticalMode()) {
-      // no-op in horizontal
-      return;
-    }
-    const container = pickContainer();
-    if (!container) {
-      console.warn('[AutoAdvance] No scroll container found; skipping.');
-      return;
-    }
-
-    // Create a sentinel at the end of the container
-    const sentinelId = 'inkwell-bottom-sentinel';
-    let sentinel = document.getElementById(sentinelId);
-    if (!sentinel){
-      sentinel = document.createElement('div');
-      sentinel.id = sentinelId;
-      sentinel.style.cssText = 'width:1px;height:1px;opacity:0;';
-      // Append once; for window-scrolling, appending to body is fine
-      (container === document.body ? document.body : container).appendChild(sentinel);
-    }
-
-    let triggered = false;
-    let rearmPlanned = false;
-    let lastHeight = container.scrollHeight || document.body.scrollHeight;
-
-    // Helper to (re)arm after chapter load (detect via height change or events)
-    function planRearm(){
-      if (rearmPlanned) return;
-      rearmPlanned = true;
-      const start = Date.now();
-      const poll = setInterval(() => {
-        const h = container.scrollHeight || document.body.scrollHeight;
-        if (Math.abs(h - lastHeight) > 400 || Date.now() - start > 5000){
-          // content likely changed (new chapter), rearm
-          lastHeight = h;
-          triggered = false;
-          rearmPlanned = false;
-          clearInterval(poll);
-        }
-      }, 250);
-    }
-
-    // Listen for host's chapter-loaded style events to rearm immediately
-    const evtNames = ['inkwell:chapter-loaded','reader:chapterLoaded','chapter:loaded'];
-    const onLoaded = () => { triggered = false; };
-    evtNames.forEach(n => window.addEventListener(n, onLoaded));
-
-    const io = new IntersectionObserver((entries) => {
-      if (!isVerticalMode()) return;
-      for (const e of entries){
-        if (e.isIntersecting && !triggered){
-          // Add a short dwell to avoid accidental edge-hit
-          triggered = true;
-          setTimeout(() => {
-            // verify still bottom-ish
-            const bottom = (container === document.body ? window.scrollY + window.innerHeight : container.scrollTop + container.clientHeight);
-            const max = (container === document.body ? document.documentElement.scrollHeight : container.scrollHeight);
-            if (max - bottom <= 160){
-              advanceChapter();
-              planRearm();
-            } else {
-              // not really bottom; allow re-trigger
-              triggered = false;
-            }
-          }, 300);
-        }
-      }
-    }, {
-      // If container is body/window, root=null observes viewport; else root is the container
-      root: (container === document.body ? null : container),
-      rootMargin: '0px 0px -80px 0px',
-      threshold: 0.99
-    });
-
-    io.observe(sentinel);
-    // Expose a tiny API to rearm manually if needed
-    window.InkWellAutoAdvance = {
-      rearm(){ triggered = false; },
-      detach(){ try{ io.disconnect(); }catch{}; evtNames.forEach(n => window.removeEventListener(n, onLoaded)); }
-    };
-
-    console.log('[AutoAdvance] Enabled in vertical mode.');
-  }
-
-  if (document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', attachAutoAdvance, { once:true });
-  } else {
-    attachAutoAdvance();
-  }
-})();
-// ================== /InkWell Auto-Advance ==================
-
-</script>
 <!-- Floating Next Chapter Button (appears near end, vertical mode only) -->
 <script>
 (function(){
@@ -2456,7 +2314,69 @@ document.addEventListener('error', function (e) {
   window.InkWellNextFab = { show: showFab, hide: hideFab, rearm: onScroll };
 })();
 </script>
-</body>
+<script>
+(function nextToolbarWire(){
+  const log = (...a) => console.log("[NextToolbar]", ...a);
+
+  // Resolve vertical mode similarly to your app's logic
+  function isVertical(){
+    try {
+      if (window.ReaderState && typeof window.ReaderState.getMode === 'function') {
+        return window.ReaderState.getMode() === 'vertical';
+      }
+    } catch {}
+    const p = new URLSearchParams(location.search).get('vert');
+    if (p === 'true') return true;
+    if (p === 'false') return false;
+    return (localStorage.getItem('InkWell:isVertical') === 'true');
+  }
+
+  function forwardViaTapZone(){
+    const rightTap = document.querySelector('.edge-shield.right, #rightTapZone, [data-role="tap-right"]');
+    if (rightTap) {
+      try { rightTap.click(); return true; } catch(e){}
+    }
+    return false;
+  }
+  function forwardFallback(){
+    if (typeof window.nextPage === 'function') return window.nextPage();
+    if (typeof window.pageForward === 'function') return window.pageForward();
+    if (typeof window.advancePage === 'function') return window.advancePage();
+    if (typeof window.goToNextPage === 'function') return window.goToNextPage();
+    if (typeof window.next === 'function') return window.next();
+    if (typeof window.nextChapter === 'function') return window.nextChapter();
+    if (typeof window.goToNextChapter === 'function') return window.goToNextChapter();
+    if (typeof window.loadChapter === 'function') {
+      const idx = (window.currentChapterIndex ?? window.chap ?? 0) + 1;
+      return window.loadChapter(idx, 'start');
+    }
+    document.dispatchEvent(new CustomEvent('inkwell:next', { bubbles: true }));
+    document.dispatchEvent(new CustomEvent('inkwell:next-chapter', { bubbles: true }));
+    log("Dispatched inkwell:next (+ next-chapter) – no known function found.");
+  }
+  function goForward(){
+    if (!forwardViaTapZone()) forwardFallback();
+  }
+
+  function applyMode(){
+    const v = isVertical();
+    if (v) document.body.classList.add('vertical-mode'); else document.body.classList.remove('vertical-mode');
+    const btn = document.getElementById('next-toolbar-btn');
+    if (!btn) return;
+    btn.onclick = goForward;
+    log(v ? "Wired in vertical mode." : "Hidden in horizontal mode.");
+  }
+
+  if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', applyMode, { once:true });
+  } else {
+    applyMode();
+  }
+
+  // Re-arm after chapter changes if your app fires this event
+  document.addEventListener('chapter:changed', applyMode);
+})();
+</script></body>
 <script>
 // Dynamically keep --toolbar-h in sync with actual toolbar height (safe for iOS browser chrome changes)
 (function(){
@@ -2574,11 +2494,35 @@ document.addEventListener('error', function (e) {
 /* Disable side tap zones in vertical mode so clicks aren't intercepted */
 body.vertical-mode .edge-shield { display: none !important; pointer-events: none !important; }
 </style><style>
-/* Kill-switch: hide any bottom "Next" FAB that may be injected by older scripts */
-#next-chapter-btn,
-.next-fab,
-[data-next-fab],
-button[aria-label="Next"].fab,
-button.next-fab,
-a.next-fab { display: none !important; visibility: hidden !important; pointer-events: none !important; }
+/* Next CTA bar directly below toolbar */
+#next-cta-bar {
+  position: sticky;
+  top: 48px;                 /* adjust if your toolbar is taller */
+  z-index: 19;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 12px;
+  backdrop-filter: blur(6px);
+  background: rgba(17,24,39,.6);
+  border-bottom: 1px solid #1f2937;
+}
+/* Professional pill button */
+#next-toolbar-btn {
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-weight: 600;
+  font-size: 14px;
+  color: #fff;
+  background: #2563eb;
+  box-shadow: 0 8px 18px rgba(0,0,0,.25);
+  cursor: pointer;
+}
+#next-toolbar-btn:hover { background:#1e40af; }
+/* Only show CTA bar in vertical mode */
+body:not(.vertical-mode) #next-cta-bar { display: none; }
+/* Disable side tap zones in vertical mode so they don't steal clicks */
+body.vertical-mode .edge-shield { display: none !important; pointer-events: none !important; }
 </style></head></html>
