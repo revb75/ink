@@ -2,42 +2,23 @@
 
 <html lang="en">
 <head>
-
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-    <script>
-      (function(){
-        try{
-          if(!window.__supabase){
-            window.__supabase = supabase.createClient(
-              'https://hrxkqvifqawrnpzokome.supabase.co',
-              'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhyeGtxdmlmcWF3cm5wem9rb21lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcxNzQ0MDIsImV4cCI6MjA2Mjc1MDQwMn0.UZVhGweJEQBxqtrp37G77YmAefQWZYDGzdk1lyj4ua4',
-              { auth: { storageKey: 'inkwell.auth', autoRefreshToken: true, persistSession: true, detectSessionInUrl: true } }
-            );
-          }
-          window.supabase = window.__supabase;
-        }catch(e){ console.error('Supabase init error:', e); }
-      })();
-    </script>
-    
   <!-- INKWELL-BUILD: reader.fixed  -->
   
 <script type="module">
-import { supabase } from '/js/supabase.js';
-import { withUser } from '/js/auth.js';
+import { supabase } from './js/supabase.js';
+import { withUser } from './js/auth.js';
 
 withUser(async (uid) => {
   const params = new URLSearchParams(location.search);
   const bookId = params.get('book_id') || params.get('book');
   if (!bookId) return;
 
-  let progress = null;
-const __variants = [bookId, bookId.replace(/\+/g,' '), bookId.replace(/ /g,'+')];
-for (const __v of __variants){
-  const { data, error } = await window.supabase.from('reading_progress').select('chapter_index,page_number').eq('user_id', uid).eq('book_id', __v)
-
-  if (!error){ progress = data; break; }
-  console.warn('[InkWell] progress fetch failed for variant %o:', __v, error);
-}
+  const { data: progress } = await supabase
+    .from('reading_progress')
+    .select('chapter_index,page_number')
+    .eq('user_id', uid)
+    .eq('book_id', bookId)
+    .maybeSingle();
 
   if (typeof initReader === 'function') {
     initReader(progress || { chapter_index: 0, page_number: 0 });
@@ -52,127 +33,10 @@ for (const __v of __variants){
   const SUPABASE_ANON_KEY = window.INKWELL_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhyeGtxdmlmcWF3cm5wem9rb21lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcxNzQ0MDIsImV4cCI6MjA2Mjc1MDQwMn0.UZVhGweJEQBxqtrp37G77YmAefQWZYDGzdk1lyj4ua4';
   
 
-  // bootstrap stub; external supabase handles client
-})();
 </script>
 
 
-  <script>
-// /js/reader-state.fixed.js
-// Robust gating for vertical vs. horizontal with deduped logs.
-// Exposes window.ReaderState with setScrollResolver, onProgress, refresh, setModeVertical, getMode.
-
-(function(){
-  'use strict';
-
-  if (window.__INKWELL_READER_STATE__) return;
-  window.__INKWELL_READER_STATE__ = true;
-
-  const on = (el, ev, fn, opts) => el.addEventListener(ev, fn, opts||false);
-
-  function resolveIsVertical(){
-    if (window.INKWELL_MODE && typeof window.INKWELL_MODE.isVertical === 'boolean') return window.INKWELL_MODE.isVertical;
-    const persisted = localStorage.getItem('InkWell:isVertical');
-    const url = new URL(window.location.href);
-    const vertParam = url.searchParams.get('vert');
-    if (vertParam === 'true') return true;
-    if (vertParam === 'false') return false;
-    return persisted === 'true';
-  }
-
-  function throttle(fn, ms){
-    let last = 0, timer = null, lastArgs = null;
-    return function(){
-      lastArgs = arguments;
-      const now = Date.now();
-      const rem = ms - (now - last);
-      if (rem <= 0){
-        last = now;
-        fn.apply(this, lastArgs);
-      } else if (!timer){
-        timer = setTimeout(() => {
-          timer = null;
-          last = Date.now();
-          fn.apply(this, lastArgs);
-        }, Math.max(0, rem));
-      }
-    };
-  }
-
-  function defaultResolver(){
-    const chapter = 0;
-    const page = Math.max(0, Math.round(window.scrollY / Math.max(1, window.innerHeight * 0.9)));
-    return { chapter, page };
-  }
-
-  let isVertical = resolveIsVertical();
-  let resolver = defaultResolver;
-  let scrollHandler = null;
-  let lastKey = '';
-  let skipLogged = false;
-
-  let onProgress = ({chapter, page}) => {
-    console.log('📖 Saving vertical progress: Chapter %d, Page %d', chapter, page);
-  };
-
-  function attachScroll(){
-    if (scrollHandler) return;
-    const handler = throttle(function(){
-      const {chapter, page} = resolver();
-      const key = chapter + ':' + page;
-      if (key !== lastKey){
-        lastKey = key;
-        try { onProgress({chapter, page}); } catch(e){ console.error('onProgress error:', e); }
-      }
-    }, 200);
-    scrollHandler = handler;
-    on(window, 'scroll', handler, { passive: true });
-    handler();
-  }
-
-  function detachScroll(){
-    if (!scrollHandler) return;
-    window.removeEventListener('scroll', scrollHandler, { passive: true });
-    scrollHandler = null;
-  }
-
-  function applyMode(){
-    isVertical = resolveIsVertical();
-    if (isVertical){
-      console.info('ℹ️ Vertical mode (persisted)');
-      attachScroll();
-    } else {
-      console.info('ℹ️ Horizontal mode (persisted)');
-      if (!skipLogged){
-        console.info('🚫 Skipping scroll tracking in horizontal mode');
-        skipLogged = true;
-      }
-      detachScroll();
-    }
-  }
-
-  if (document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', applyMode, { once: true });
-  } else {
-    applyMode();
-  }
-
-  window.ReaderState = {
-    setScrollResolver(fn){ if (typeof fn === 'function') resolver = fn; },
-    onProgress(fn){ if (typeof fn === 'function') onProgress = fn; },
-    refresh(){ applyMode(); },
-    setModeVertical(v){ 
-      const b = v === true;
-      localStorage.setItem('InkWell:isVertical', String(b));
-      if (!window.INKWELL_MODE) window.INKWELL_MODE = {};
-      window.INKWELL_MODE.isVertical = b;
-      applyMode();
-    },
-    getMode(){ return isVertical ? 'vertical' : 'horizontal'; }
-  };
-})();
-
-</script>
+  <script src="/js/reader-state.js"></script>
 <style>
   #toolbar {
     position: fixed !important;
@@ -722,7 +586,6 @@ a[class*="next"][class*="chapter"] {
 <div class="group" id="toolbar-center" style="display:flex; justify-content:center; flex:1;">
 <button class="btn" id="quiet-btn" title="Quiet mode (brown noise)">
   <span class="material-symbols-outlined">spa</span>
-</button>
 </div>
 <div class="group" id="toolbar-right" style="display:flex; align-items:center; justify-content:flex-end; gap:12px; flex:1;">
 <button class="btn" id="toggle-highlight" title="Highlight mode">
@@ -901,13 +764,8 @@ a[class*="next"][class*="chapter"] {
     };
     async function saveReadingProgress(chIndex, pg) {
   if(window.SWIPE_DISABLED) return;
-    const __u = new URL(window.location.href);
-const __isVertical = document.body.classList.contains('vertical-mode')
-  || __u.searchParams.get('vert') === 'true'
-  || localStorage.getItem('InkWell:isVertical') === 'true';
-if (!__isVertical) { return; }
-const currentChapter = window.currentChapter ?? (window.chapter ?? 0);
-  console.log(`📖 Saving vertical progress: Chapter ${currentChapter}, Page ${pg}`);
+  const currentChapter = window.currentChapter ?? (window.chapter ?? 0);
+  console.log(`📖 Saving vertical progress: Chapter ${currentChapter}, Page ${page}`);
 const { data:{ session } } = await window.supabase.auth.getSession();
       const uid = session?.user?.id;
       if (!uid || !bookId) return;
@@ -915,7 +773,6 @@ const { error } = await window.supabase.from('reading_progress').upsert({
   user_id: uid, book_id: bookId, chapter_index: chIndex,
   page_number: pg, book_slug: slug, recorded_at: new Date().toISOString()
 }, { onConflict:['user_id','book_id'] });
-if (error) console.error('[InkWell] upsert reading_progress failed:', error);
 if (error && error.code !== '409') console.error('Save progress failed', error);
     }
 
@@ -1286,17 +1143,11 @@ if (error && error.code !== '409') console.error('Save progress failed', error);
         document.head.appendChild(Object.assign(document.createElement('style'),{textContent:css}));
       }));
 
-      let saved = null;
-      for (const __v of [bookId, bookId.replace(/\+/g,' '), bookId.replace(/ /g,'+')]){
-        const { data, error } = await window.supabase
-          .from('reading_progress')
-          .select('chapter_index,page_number')
-          .eq('user_id', userId)
-          .eq('book_id', __v)
-          .maybeSingle();
-        if (!error){ saved = data; break; }
-        console.warn('[InkWell] saved fetch failed for variant %o:', __v, error);
-      }
+      const { data:saved } = await window.supabase.from('reading_progress')
+        .select('chapter_index,page_number')
+        .eq('user_id',userId)
+        .eq('book_id',bookId)
+        .maybeSingle();
       const startChap = saved?.chapter_index ?? 0;
       const startPage = saved?.page_number ?? 0;
 
@@ -1890,7 +1741,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     return;
   }
 
-  const { data: { session } } = await window.supabase.auth.getSession();
+  const { data: { session } } = await supabase.auth.getSession();
   if (session?.user) {
     if (loginScreen) loginScreen.style.display = "none";
     return;
@@ -1900,7 +1751,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const access_token = url.searchParams.get("access_token");
   const refresh_token = url.searchParams.get("refresh_token");
   if (access_token && refresh_token) {
-    const { error } = await window.supabase.auth.setSession({ access_token, refresh_token });
+    const { error } = await supabase.auth.setSession({ access_token, refresh_token });
     if (!error && loginScreen) {
       loginScreen.style.display = "none";
       return;
@@ -1917,7 +1768,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
       }
       loginMsg.textContent = "Sending magic link...";
-      const { error } = await window.supabase.auth.signInWithOtp({ email });
+      const { error } = await supabase.auth.signInWithOtp({ email });
       loginMsg.textContent = error ? ("Error: " + error.message) : "Check your email for the magic link.";
     });
   }
@@ -2416,9 +2267,9 @@ function setHighlightMode(active) {
   }, true);
 });
 
-const HL_BTN = document.getElementById('highlight-btn');
-if (HL_BTN) {
-  HL_BTN.addEventListener('click', () => {
+const highlightBtn = document.getElementById('highlight-btn');
+if (highlightBtn) {
+  highlightBtn.addEventListener('click', () => {
     setHighlightMode(!window.INKWELL_HIGHLIGHT_MODE);
     if (window.INKWELL_HIGHLIGHT_MODE) {
       if (typeof switchToDomMode === 'function') switchToDomMode();
@@ -2447,6 +2298,149 @@ document.addEventListener('error', function (e) {
     for (const sel of sels) document.querySelectorAll(sel).forEach(n=>n.remove());
   });
 })();
+</script>
+<script>
+
+// ================== InkWell Auto-Advance (Vertical Only) ==================
+(function(){
+  if (window.__INKWELL_AUTOADV_INSTALLED__) return;
+  window.__INKWELL_AUTOADV_INSTALLED__ = true;
+
+  // Detect vertical mode robustly
+  function isVerticalMode(){
+    try {
+      if (window.ReaderState?.getMode && window.ReaderState.getMode() === 'vertical') return true;
+      const url = new URL(window.location.href);
+      const vertParam = url.searchParams.get('vert');
+      if (vertParam === 'true') return true;
+      if (document.body.classList.contains('vertical-mode')) return true;
+      const persisted = localStorage.getItem('InkWell:isVertical');
+      return persisted === 'true';
+    } catch(e) { return false; }
+  }
+
+  // Find the best scroll container
+  function pickContainer(){
+    const order = [
+      '[data-chapter-container]',
+      '#chapter-container',
+      '#reader',
+      '#content',
+      'main',
+      'body'
+    ];
+    for (const sel of order){
+      const el = document.querySelector(sel);
+      if (el) return el;
+    }
+    return document.body;
+  }
+
+  // Advance strategy attempts
+  async function advanceChapter(){
+    console.log('[AutoAdvance] Bottom reached — advancing to next chapter…');
+    if (typeof window.nextChapter === 'function') { window.nextChapter(); return; }
+    if (typeof window.goToNextChapter === 'function') { window.goToNextChapter(); return; }
+    if (typeof window.loadChapter === 'function' && typeof window.currentChapterIndex === 'number'){
+      try { window.loadChapter(window.currentChapterIndex + 1); return; } catch {}
+    }
+    // Fallback event if host wants to hook it
+    window.dispatchEvent(new CustomEvent('inkwell:next-chapter'));
+  }
+
+  function attachAutoAdvance(){
+    if (!isVerticalMode()) {
+      // no-op in horizontal
+      return;
+    }
+    const container = pickContainer();
+    if (!container) {
+      console.warn('[AutoAdvance] No scroll container found; skipping.');
+      return;
+    }
+
+    // Create a sentinel at the end of the container
+    const sentinelId = 'inkwell-bottom-sentinel';
+    let sentinel = document.getElementById(sentinelId);
+    if (!sentinel){
+      sentinel = document.createElement('div');
+      sentinel.id = sentinelId;
+      sentinel.style.cssText = 'width:1px;height:1px;opacity:0;';
+      // Append once; for window-scrolling, appending to body is fine
+      (container === document.body ? document.body : container).appendChild(sentinel);
+    }
+
+    let triggered = false;
+    let rearmPlanned = false;
+    let lastHeight = container.scrollHeight || document.body.scrollHeight;
+
+    // Helper to (re)arm after chapter load (detect via height change or events)
+    function planRearm(){
+      if (rearmPlanned) return;
+      rearmPlanned = true;
+      const start = Date.now();
+      const poll = setInterval(() => {
+        const h = container.scrollHeight || document.body.scrollHeight;
+        if (Math.abs(h - lastHeight) > 400 || Date.now() - start > 5000){
+          // content likely changed (new chapter), rearm
+          lastHeight = h;
+          triggered = false;
+          rearmPlanned = false;
+          clearInterval(poll);
+        }
+      }, 250);
+    }
+
+    // Listen for host's chapter-loaded style events to rearm immediately
+    const evtNames = ['inkwell:chapter-loaded','reader:chapterLoaded','chapter:loaded'];
+    const onLoaded = () => { triggered = false; };
+    evtNames.forEach(n => window.addEventListener(n, onLoaded));
+
+    const io = new IntersectionObserver((entries) => {
+      if (!isVerticalMode()) return;
+      for (const e of entries){
+        if (e.isIntersecting && !triggered){
+          // Add a short dwell to avoid accidental edge-hit
+          triggered = true;
+          setTimeout(() => {
+            // verify still bottom-ish
+            const bottom = (container === document.body ? window.scrollY + window.innerHeight : container.scrollTop + container.clientHeight);
+            const max = (container === document.body ? document.documentElement.scrollHeight : container.scrollHeight);
+            if (max - bottom <= 160){
+              advanceChapter();
+              planRearm();
+            } else {
+              // not really bottom; allow re-trigger
+              triggered = false;
+            }
+          }, 300);
+        }
+      }
+    }, {
+      // If container is body/window, root=null observes viewport; else root is the container
+      root: (container === document.body ? null : container),
+      rootMargin: '0px 0px -80px 0px',
+      threshold: 0.99
+    });
+
+    io.observe(sentinel);
+    // Expose a tiny API to rearm manually if needed
+    window.InkWellAutoAdvance = {
+      rearm(){ triggered = false; },
+      detach(){ try{ io.disconnect(); }catch{}; evtNames.forEach(n => window.removeEventListener(n, onLoaded)); }
+    };
+
+    console.log('[AutoAdvance] Enabled in vertical mode.');
+  }
+
+  if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', attachAutoAdvance, { once:true });
+  } else {
+    attachAutoAdvance();
+  }
+})();
+// ================== /InkWell Auto-Advance ==================
+
 </script>
 </body>
 
