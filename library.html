@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>InkWell Library</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Fonts + Supabase -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Lora:wght@600&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+  <script type="module" src="/js/supabase.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Your CSS styles (unchanged, but cleaned indentation) -->
+  <style>
+    /* Your CSS from original file goes here */
+    /* ... keep all style blocks exactly as in your working version ... */
+  </style>
+</head>
+<body>
+  <header>
+    <button class="menu-btn" onclick="toggleMenu()">☰</button>
+  </header>
+
+  <div class="overlay" id="overlayMenu">
+    <button class="close-btn" onclick="toggleMenu()">✕</button>
+    <nav>
+      <a href="/dashboard.html">Dashboard</a>
+      <a href="/analytics.html">Analytics</a>
+      <a href="/upload.html">Upload</a>
+      <a href="/library.html">Library</a>
+      <a href="/profile.html">Profile</a>
+      <button onclick="logout()">Logout</button>
+    </nav>
+  </div>
+
+  <div id="filters">
+    <select id="filter-genre"><option>All Genres</option></select>
+    <select id="filter-year"><option>All Years</option></select>
+    <select id="filter-type"><option>All Types</option></select>
+  </div>
+
+  <div id="library"></div>
+
+  <script>
+    const SUPA_URL = 'https://hrxkqvifqawrnpzokome.supabase.co';
+    const SUPA_KEY = 'YOUR_PUBLIC_ANON_KEY';
+    const sb = supabase.createClient(SUPA_URL, SUPA_KEY, { auth: { persistSession: true } });
+    let books = [];
+
+    function render(list) {
+      const lib = document.getElementById('library');
+      lib.innerHTML = '';
+      list.forEach(b => {
+        const d = document.createElement('div');
+        d.className = 'book';
+        d.innerHTML = `
+          ${b.slug ? `<a href="/reader.html?book=${b.slug}">` : ''}
+            <img src="${b.cover}" alt="${b.title} cover"/>
+          ${b.slug ? `</a>` : ''}
+          ${b.author ? `<p>${b.author}</p>` : ''}
+          <p>${b.mood || '–'}, ${b.length || '–'}, ${b.year || '–'}</p>
+        `;
+        lib.appendChild(d);
+      });
+    }
+
+    function populateFilters(list) {
+      const gSel = document.getElementById('filter-genre');
+      const ySel = document.getElementById('filter-year');
+      const tSel = document.getElementById('filter-type');
+      const genres = [...new Set(list.map(b => b.mood))].sort();
+      const years  = [...new Set(list.map(b => b.year))].sort((a,b)=>a-b);
+      const types  = [...new Set(list.map(b => b.length))].sort();
+      genres.forEach(g => gSel.add(new Option(g)));
+      years.forEach(y => ySel.add(new Option(y)));
+      types.forEach(t => tSel.add(new Option(t)));
+      [gSel, ySel, tSel].forEach(sel => sel.addEventListener('change', applyFilters));
+    }
+
+    function applyFilters() {
+      const g = document.getElementById('filter-genre').value;
+      const y = document.getElementById('filter-year').value;
+      const t = document.getElementById('filter-type').value;
+      let out = books.slice();
+      if (g !== 'All Genres') out = out.filter(b => b.mood === g);
+      if (y !== 'All Years')  out = out.filter(b => b.year == y);
+      if (t !== 'All Types')  out = out.filter(b => b.length === t);
+      render(out);
+    }
+
+    async function loadBooks() {
+      const { data, error } = await sb.from('books').select('title,slug,genre,tags,upload_time');
+      if (error) return console.error('Error:', error);
+      books = data.map(b => ({
+        title: b.title,
+        author: '',
+        slug: b.slug,
+        cover: `${SUPA_URL}/storage/v1/object/public/books/${b.slug}/OEBPS/images/cover-front.jpg`,
+        mood: b.genre || 'Uncategorized',
+        length: Array.isArray(b.tags) && b.tags.length ? b.tags[0] : 'Unknown',
+        year: b.upload_time ? new Date(b.upload_time).getFullYear() : ''
+      }));
+      books.sort((a, b) => b.year - a.year);
+      populateFilters(books);
+      render(books);
+    }
+
+    document.addEventListener('DOMContentLoaded', loadBooks);
+
+    // Nav + logout
+    window.toggleMenu = function(){
+      const el = document.getElementById('overlayMenu');
+      if (el) el.classList.toggle('show');
+    };
+    window.logout = function(){
+      try { if (typeof supabase !== 'undefined') supabase.auth.signOut(); } catch(e) {}
+      alert('Logging out...');
+    };
+  </script>
+</body>
+</html>
