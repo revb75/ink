@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover"/>
+  <title>InkWell — New Reader</title>
+  <link rel="stylesheet" href="/css/new-reader.css"/>
+  <style>
+    /* Minimal critical styles (rest in /css/new-reader.css) */
+    :root{--toolbar-h:56px}
+    body{margin:0;font:16px/1.5 system-ui,-apple-system,Segoe UI,Inter,Arial}
+    #toolbar{position:sticky;top:0;z-index:1000;height:var(--toolbar-h);display:flex;align-items:center;justify-content:space-between;padding:0 12px;border-bottom:1px solid #e5e5e8;background:#fafafa}
+    .group{display:flex;gap:10px;align-items:center}
+    .btn{appearance:none;border:0;background:none;padding:6px 10px;border-radius:10px;cursor:pointer}
+    .btn:active{transform:translateY(1px)}
+    #reader{max-width:900px;margin:0 auto;padding:16px}
+    .page{min-height:72vh}
+    .toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#111;color:#fff;padding:8px 12px;border-radius:10px;display:none}
+    .toast.show{display:block}
+    /* vertical mode */
+    body.vertical #reader{column-count:1}
+  </style>
+</head>
+<body>
+  <header id="toolbar">
+    <div class="group">
+      <button class="btn" id="libraryBtn" title="Library">📚</button>
+      <strong id="title">New Reader</strong>
+    </div>
+    <div class="group">
+      <button class="btn" id="hlBtn" title="Highlight">🖍️</button>
+      <button class="btn" id="modeBtn" title="Toggle vertical/horizontal">↕︎</button>
+      <span id="loginBadge" style="font-size:.9rem;color:#888">Guest</span>
+    </div>
+  </header>
+
+  <main id="reader"></main>
+  <div id="toast" class="toast"></div>
+
+  <!-- Single module boot -->
+  <script type="module" src="/js/new-reader.module.js"></script>
+</body>
+</html>
