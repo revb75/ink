@@ -2442,6 +2442,115 @@ document.addEventListener('error', function (e) {
 // ================== /InkWell Auto-Advance ==================
 
 </script>
+<!-- Floating Next Chapter Button (appears near end, vertical mode only) -->
+  <button id="inkwell-next-fab" aria-label="Next chapter" title="Next chapter">
+    <span class="icon">›</span>
+    <span>Next</span>
+    <span class="dismiss" aria-hidden="true">✕</span>
+  </button>
+
+  <script>
+  (function(){
+    'use strict';
+    const doc = document;
+    let modeGetter = () => {
+      try {
+        if (window.ReaderState && typeof window.ReaderState.getMode === 'function') return window.ReaderState.getMode();
+      } catch(e){}
+      // Fallbacks
+      const p = new URLSearchParams(location.search).get('vert');
+      if (p === 'true') return 'vertical';
+      if (p === 'false') return 'horizontal';
+      if (doc.body && doc.body.classList.contains('vertical-mode')) return 'vertical';
+      return (localStorage.getItem('InkWell:isVertical') === 'true') ? 'vertical' : 'horizontal';
+    };
+
+    function callNextChapter(){
+      if (typeof window.nextChapter === 'function') return window.nextChapter();
+      if (typeof window.goToNextChapter === 'function') return window.goToNextChapter();
+      if (typeof window.loadChapter === 'function' && typeof window.currentChapterIndex !== 'undefined'){
+        return window.loadChapter(window.currentChapterIndex + 1);
+      }
+      // Fallback event
+      window.dispatchEvent(new CustomEvent('inkwell:next-chapter'));
+    }
+
+    let fab = doc.getElementById('inkwell-next-fab');
+    if (!fab){
+      // Should not happen since we inserted HTML above, but be defensive
+      fab = doc.createElement('button');
+      fab.id = 'inkwell-next-fab';
+      fab.textContent = 'Next ›';
+      doc.body.appendChild(fab);
+    }
+
+    let dismissedUntilAway = false;
+    let longPressTimer = null;
+
+    const showFab = () => { if (!dismissedUntilAway) fab.classList.add('show'); };
+    const hideFab = () => fab.classList.remove('show');
+
+    // Click: advance
+    fab.addEventListener('click', (e) => {
+      // If user clicked the little dismiss '✕', just dismiss
+      if (e.target && e.target.classList && e.target.classList.contains('dismiss')){
+        dismissedUntilAway = true;
+        hideFab();
+        return;
+      }
+      callNextChapter();
+      dismissedUntilAway = true;
+      hideFab();
+    });
+
+    // Long-press anywhere on the FAB to dismiss until moving away from bottom
+    const startLP = () => { longPressTimer = setTimeout(() => { dismissedUntilAway = true; hideFab(); }, 600); };
+    const endLP = () => { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } };
+    ['pointerdown','touchstart','mousedown'].forEach(ev => fab.addEventListener(ev, startLP, {passive:true}));
+    ['pointerup','pointercancel','touchend','touchcancel','mouseup','mouseleave'].forEach(ev => fab.addEventListener(ev, endLP, {passive:true}));
+
+    // Track distance-to-bottom; show FAB when <= 320px, hide when farther.
+    let lastShown = false;
+    const NEAR_PX = 320;
+
+    function distToBottom(){
+      const el = doc.scrollingElement || doc.documentElement;
+      return Math.max(0, el.scrollHeight - (el.scrollTop + el.clientHeight));
+    }
+
+    function onScroll(){
+      if (modeGetter() !== 'vertical') { hideFab(); return; }
+      const d = distToBottom();
+      const shouldShow = (d <= NEAR_PX);
+      if (dismissedUntilAway && d > NEAR_PX + 40){ // small hysteresis before re-arming
+        dismissedUntilAway = false;
+      }
+      if (shouldShow && !dismissedUntilAway) showFab();
+      else hideFab();
+    }
+
+    // Re-run on resize/content changes
+    window.addEventListener('scroll', onScroll, {passive:true});
+    window.addEventListener('resize', onScroll, {passive:true});
+    // If your reader fires a chapter-loaded event, re-arm
+    window.addEventListener('inkwell:chapter-loaded', () => { dismissedUntilAway = false; onScroll(); });
+    window.addEventListener('reader:chapterLoaded', () => { dismissedUntilAway = false; onScroll(); });
+
+    // Initial run after DOM
+    if (doc.readyState === 'loading'){
+      doc.addEventListener('DOMContentLoaded', onScroll, { once: true });
+    } else {
+      onScroll();
+    }
+
+    // Expose minimal API
+    window.InkWellNextFab = {
+      show: () => { dismissedUntilAway = false; showFab(); },
+      hide: hideFab,
+      rearm: () => { dismissedUntilAway = false; onScroll(); }
+    };
+  })();
+  </script>
 </body>
 
 <script>
@@ -2534,5 +2643,34 @@ document.addEventListener('error', function (e) {
   background: none;
   padding: 4px;
 }
+</style>
+<style>
+/* --- Floating Next Chapter button (FAB) --- */
+  #inkwell-next-fab {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: 10000;
+    display: none;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 14px;
+    border-radius: 9999px;
+    background: rgba(20,20,20,.92);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,.12);
+    box-shadow: 0 6px 20px rgba(0,0,0,.25);
+    font: 500 14px/1 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+  #inkwell-next-fab.show { display: inline-flex; }
+  #inkwell-next-fab .icon { font-size: 16px; }
+  #inkwell-next-fab .dismiss {
+    font-size: 16px;
+    opacity: .8;
+    padding: 0 2px;
+  }
+  #inkwell-next-fab:active { transform: translateY(1px); }
 </style>
 </head></html>
