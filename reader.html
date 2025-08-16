@@ -2,40 +2,62 @@
 
 <html lang="en">
 <head>
-<script>
-(function(){
-  var URL = 'https://hrxkqvifqawrnpzokome.supabase.co';
-  var KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhyeGtxdmlmcWF3cm5wem9rb21lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcxNzQ0MDIsImV4cCI6MjA2Mjc1MDQwMn0.UZVhGweJEQBxqtrp37G77YmAefQWZYDGzdk1lyj4ua4';
-  if (!window.__supabase_loading) {
-    window.__supabase_loading = true;
-    window.supabaseReady = (async function(){
-      if (!window.supabase || !window.supabase.auth || !window.supabase.from) {
-        await new Promise(function(resolve){
-          var s = document.createElement('script');
-          s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js';
-          s.onload = resolve;
-          document.head.appendChild(s);
-        });
-        if (!window.supabase || !window.supabase.createClient) {
-          console.error('[InkWell] Failed to load Supabase library');
-          return null;
-        }
-        window.__supabase = window.supabase.createClient(URL, KEY, {
-          auth: { storageKey: 'inkwell.auth', autoRefreshToken: true, persistSession: true, detectSessionInUrl: true }
-        });
-        window.supabase = window.__supabase;
-      }
-      return window.supabase;
-    })();
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script>
+      (function(){
+        try{
+          if(!window.__supabase){
+            window.__supabase = supabase.createClient(
+              'https://hrxkqvifqawrnpzokome.supabase.co',
+              'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhyeGtxdmlmcWF3cm5wem9rb21lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcxNzQ0MDIsImV4cCI6MjA2Mjc1MDQwMn0.UZVhGweJEQBxqtrp37G77YmAefQWZYDGzdk1lyj4ua4',
+              { auth: { storageKey: 'inkwell.auth', autoRefreshToken: true, persistSession: true, detectSessionInUrl: true } }
+            );
+          }
+          window.supabase = window.__supabase;
+        }catch(e){ console.error('Supabase init error:', e); }
+      })();
+    </script>
+    
+  <!-- INKWELL-BUILD: reader.fixed  -->
+  
+<script type="module">
+import { supabase } from './js/supabase.js';
+import { withUser } from './js/auth.js';
+
+withUser(async (uid) => {
+  const params = new URLSearchParams(location.search);
+  const bookId = params.get('book_id') || params.get('book');
+  if (!bookId) return;
+
+  let progress = null;
+const __variants = [bookId, bookId.replace(/\+/g,' '), bookId.replace(/ /g,'+')];
+for (const __v of __variants){
+  const { data, error } = await window.supabase.from('reading_progress').select('chapter_index,page_number').eq('user_id', uid).eq('book_id', __v)
+
+  if (!error){ progress = data; break; }
+  console.warn('[InkWell] progress fetch failed for variant %o:', __v, error);
+}
+
+  if (typeof initReader === 'function') {
+    initReader(progress || { chapter_index: 0, page_number: 0 });
+  } else {
+    console.error('[Reader] initReader not found.');
   }
+});
+
+// Inline Supabase bootstrap (no external /js/supabase.js needed)
+(function(){
+  const SUPABASE_URL = window.INKWELL_SUPABASE_URL || 'https://hrxkqvifqawrnpzokome.supabase.co';
+  const SUPABASE_ANON_KEY = window.INKWELL_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhyeGtxdmlmcWF3cm5wem9rb21lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcxNzQ0MDIsImV4cCI6MjA2Mjc1MDQwMn0.UZVhGweJEQBxqtrp37G77YmAefQWZYDGzdk1lyj4ua4';
+  
+
+  // bootstrap stub; external supabase handles client
 })();
 </script>
 
 
-
-  <!-- INKWELL-BUILD: reader.fixed  -->
-  
-<script>
+  <script>
 // /js/reader-state.fixed.js
 // Robust gating for vertical vs. horizontal with deduped logs.
 // Exposes window.ReaderState with setScrollResolver, onProgress, refresh, setModeVertical, getMode.
@@ -1265,14 +1287,16 @@ if (error && error.code !== '409') console.error('Save progress failed', error);
       }));
 
       let saved = null;
-for (const __v of [bookId, bookId.replace(/\+/g,' '), bookId.replace(/ /g,'+')]){
-  const { data, error } = await supabaseawait window.supabase    .from('reading_progress')    .select('chapter_index,page_number')
-    .eq('user_id', userId)
-    .eq('book_id', __v)
-
-  if (!error){ saved = data; break; }
-  console.warn('[InkWell] saved fetch failed for variant %o:', __v, error);
-}
+      for (const __v of [bookId, bookId.replace(/\+/g,' '), bookId.replace(/ /g,'+')]){
+        const { data, error } = await window.supabase
+          .from('reading_progress')
+          .select('chapter_index,page_number')
+          .eq('user_id', userId)
+          .eq('book_id', __v)
+          .maybeSingle();
+        if (!error){ saved = data; break; }
+        console.warn('[InkWell] saved fetch failed for variant %o:', __v, error);
+      }
       const startChap = saved?.chapter_index ?? 0;
       const startPage = saved?.page_number ?? 0;
 
