@@ -22,8 +22,8 @@
   <!-- INKWELL-BUILD: reader.fixed  -->
   
 <script type="module">
-import { supabase } from './js/supabase.js';
-import { withUser } from './js/auth.js';
+import { supabase } from '/js/supabase.js';
+import { withUser } from '/js/auth.js';
 
 withUser(async (uid) => {
   const params = new URLSearchParams(location.search);
