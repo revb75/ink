@@ -33,6 +33,8 @@ withUser(async (uid) => {
   const SUPABASE_ANON_KEY = window.INKWELL_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhyeGtxdmlmcWF3cm5wem9rb21lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcxNzQ0MDIsImV4cCI6MjA2Mjc1MDQwMn0.UZVhGweJEQBxqtrp37G77YmAefQWZYDGzdk1lyj4ua4';
   
 
+  // bootstrap stub; external supabase handles client
+})();
 </script>
 
 
@@ -586,6 +588,7 @@ a[class*="next"][class*="chapter"] {
 <div class="group" id="toolbar-center" style="display:flex; justify-content:center; flex:1;">
 <button class="btn" id="quiet-btn" title="Quiet mode (brown noise)">
   <span class="material-symbols-outlined">spa</span>
+</button>
 </div>
 <div class="group" id="toolbar-right" style="display:flex; align-items:center; justify-content:flex-end; gap:12px; flex:1;">
 <button class="btn" id="toggle-highlight" title="Highlight mode">
@@ -764,8 +767,13 @@ a[class*="next"][class*="chapter"] {
     };
     async function saveReadingProgress(chIndex, pg) {
   if(window.SWIPE_DISABLED) return;
-  const currentChapter = window.currentChapter ?? (window.chapter ?? 0);
-  console.log(`📖 Saving vertical progress: Chapter ${currentChapter}, Page ${page}`);
+    const __u = new URL(window.location.href);
+  const __isVertical = document.body.classList.contains('vertical-mode')
+    || __u.searchParams.get('vert') === 'true'
+    || localStorage.getItem('InkWell:isVertical') === 'true';
+  if (!__isVertical) { console.info('🚫 Skipping scroll tracking in horizontal mode'); return; }
+const currentChapter = window.currentChapter ?? (window.chapter ?? 0);
+  console.log(`📖 Saving vertical progress: Chapter ${currentChapter}, Page ${pg}`);
 const { data:{ session } } = await window.supabase.auth.getSession();
       const uid = session?.user?.id;
       if (!uid || !bookId) return;
