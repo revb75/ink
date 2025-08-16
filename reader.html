@@ -21,11 +21,10 @@ for (const __v of __variants){
     .select('chapter_index,page_number')
     .eq('user_id', uid)
     .eq('book_id', __v)
-    .maybeSingle();
+
   if (!error){ progress = data; break; }
   console.warn('[InkWell] progress fetch failed for variant %o:', __v, error);
 }
-    .maybeSingle();
 
   if (typeof initReader === 'function') {
     initReader(progress || { chapter_index: 0, page_number: 0 });
@@ -45,7 +44,7 @@ for (const __v of __variants){
 </script>
 
 
-  <script src="/js/reader-state.js"></script>
+  <script src="/js/reader-state.fixed.js"></script>
 <style>
   #toolbar {
     position: fixed !important;
@@ -778,13 +777,7 @@ a[class*="next"][class*="chapter"] {
 const __isVertical = document.body.classList.contains('vertical-mode')
   || __u.searchParams.get('vert') === 'true'
   || localStorage.getItem('InkWell:isVertical') === 'true';
-if (!__isVertical) {
-  if (!window.__INKWELL_SKIP_LOGGED) {
-    console.info('🚫 Skipping scroll tracking in horizontal mode');
-    window.__INKWELL_SKIP_LOGGED = true;
-  }
-  return;
-}
+if (!__isVertical) { return; }
 const currentChapter = window.currentChapter ?? (window.chapter ?? 0);
   console.log(`📖 Saving vertical progress: Chapter ${currentChapter}, Page ${pg}`);
 const { data:{ session } } = await window.supabase.auth.getSession();
@@ -1172,7 +1165,7 @@ for (const __v of [bookId, bookId.replace(/\+/g,' '), bookId.replace(/ /g,'+')])
     .select('chapter_index,page_number')
     .eq('user_id', userId)
     .eq('book_id', __v)
-    .maybeSingle();
+
   if (!error){ saved = data; break; }
   console.warn('[InkWell] saved fetch failed for variant %o:', __v, error);
 }
