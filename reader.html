@@ -2,6 +2,16 @@
 
 <html lang="en">
 <head>
+<script>
+// Guard against duplicate reader init
+window.__INKWELL_INIT_CALLED=false;
+window.__safeInitReader=function(){
+  if(window.__INKWELL_INIT_CALLED) return;
+  window.__INKWELL_INIT_CALLED=true;
+  if(typeof window.initReader==='function') return window.initReader.apply(window, arguments);
+};
+</script>
+
 <!-- INKWELL-BUILD: reader.fixed  -->
 <script type="module">
 import { supabase } from './js/supabase.js';
@@ -19,7 +29,7 @@ withUser(async (uid) => {
     .eq('book_id', bookId)
     .maybeSingle();
 
-  if (!window.__INKWELL_INIT_CALLED && typeof initReader === 'function') { window.__INKWELL_INIT_CALLED = true; initReader(progress || { chapter_index: 0, page_number: 0 });
+  if (!window.__INKWELL_INIT_CALLED && typeof initReader === 'function') { window.__INKWELL_INIT_CALLED = true; __safeInitReader(progress || { chapter_index: 0, page_number: 0 });
   } else {
     console.error('[Reader] initReader not found.');
   }
@@ -1106,7 +1116,7 @@ if (error && error.code !== '409') console.error('Save progress failed', error);
         if (loginScreen) loginScreen.classList.add('active');
       }else{
         userId = session.user.id;
-        await initReader();
+        await __safeInitReader();
       }
       if (loginForm) loginForm.addEventListener('submit', async e=>{
         e.preventDefault();
@@ -1114,11 +1124,11 @@ if (error && error.code !== '409') console.error('Save progress failed', error);
         if(error){ alert('Login failed'); console.error(error); return; }
         loginScreen.classList.remove('active');
         userId = data.user.id;
-        await initReader();
+        await __safeInitReader();
       });
     })();
 
-    async function initReader(){
+    async function __safeInitReader(){
   if(window.SWIPE_DISABLED) return;
       slug = new URLSearchParams(location.search).get('book');
       if(!slug) return alert('Missing ?book');
@@ -1920,9 +1930,9 @@ function waitForSupabase() {
   if(window.SWIPE_DISABLED) return;
   if (typeof supabase !== 'undefined' || typeof sb !== 'undefined') {
     console.log('[InkWell] Supabase client detected, starting reader...');
-    if (!window.__INKWELL_INIT_CALLED && typeof initReader === 'function') { window.__INKWELL_INIT_CALLED = true; initReader();
+    if (!window.__INKWELL_INIT_CALLED && typeof initReader === 'function') { window.__INKWELL_INIT_CALLED = true; __safeInitReader();
     } else {
-      console.warn('[InkWell] initReader() not found');
+      console.warn('[InkWell] __safeInitReader() not found');
     }
   } else {
     console.log('[InkWell] Waiting for Supabase...');
@@ -2298,11 +2308,24 @@ document.addEventListener('error', function (e) {
   const hideFab = () => fab.classList.remove('show');
 
   function callNextChapter(){
-    if (typeof window.nextChapter === 'function') return window.nextChapter();
-    if (typeof window.goToNextChapter === 'function') return window.goToNextChapter();
-    if (typeof window.loadChapter === 'function' && typeof window.currentChapterIndex !== 'undefined'){
-      return window.loadChapter(window.currentChapterIndex + 1);
-    }
+    // 1) Prefer app's right tap zone to keep logic consistent
+    const rightTap = document.querySelector('.edge-shield.right, #rightTapZone, [data-role="tap-right"]');
+    if (rightTap){ try { rightTap.click(); return; } catch(e){} }
+    // 2) Fire any custom event the app listens to
+    try { window.dispatchEvent(new CustomEvent('inkwell:next-chapter')); } catch(e){}
+    // 3) Known chapter-advance APIs
+    const tries = [
+      () => window.nextChapter && window.nextChapter(),
+      () => window.goToNextChapter && window.goToNextChapter(),
+      () => window.goNext && window.goNext(),
+      () => window.next && window.next(),
+      () => window.turnPage && window.turnPage(1),
+      () => typeof window.loadChapter==='function' && (window.loadChapter((
+           (window.currentChapterIndex ?? window.chapterIndex ?? (window.ReaderState && typeof ReaderState.getChapterIndex==='function' && ReaderState.getChapterIndex()) ?? 0
+      ) + 1)))
+    ];
+    for (const t of tries){ try{ const r=t(); if(r!==undefined) return r; }catch(_){} }
+  }
     window.dispatchEvent(new CustomEvent('inkwell:next-chapter'));
   }
 
@@ -2495,10 +2518,7 @@ document.addEventListener('error', function (e) {
   }
   #inkwell-next-fab:active { transform: translateY(1px); }
 </style>
-<style>
-/* Disable side tap zones in vertical mode so clicks aren't intercepted */
-body.vertical-mode .edge-shield { display: none !important; pointer-events: none !important; }
-</style><style>
+<!-- removed: vertical-mode edge-shield disable to re-enable tap zones --><style>
 /* Next CTA bar directly below toolbar */
 #next-cta-bar {
   position: sticky;
@@ -2529,5 +2549,5 @@ body.vertical-mode .edge-shield { display: none !important; pointer-events: none
 /* Only show CTA bar in vertical mode */
 body:not(.vertical-mode) #next-cta-bar { display: none; }
 /* Disable side tap zones in vertical mode so they don't steal clicks */
-body.vertical-mode .edge-shield { display: none !important; pointer-events: none !important; }
+body/* tap-zones re-enabled: removed vertical-mode edge-shield override */
 </style></head></html>
