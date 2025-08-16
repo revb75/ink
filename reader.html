@@ -27,12 +27,6 @@ withUser(async (uid) => {
   }
 });
 
-// Inline Supabase bootstrap (no external /js/supabase.js needed)
-(function(){
-  const SUPABASE_URL = window.INKWELL_SUPABASE_URL || 'https://hrxkqvifqawrnpzokome.supabase.co';
-  const SUPABASE_ANON_KEY = window.INKWELL_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhyeGtxdmlmcWF3cm5wem9rb21lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcxNzQ0MDIsImV4cCI6MjA2Mjc1MDQwMn0.UZVhGweJEQBxqtrp37G77YmAefQWZYDGzdk1lyj4ua4';
-  
-
 </script>
 
 
@@ -2443,221 +2437,83 @@ document.addEventListener('error', function (e) {
 
 </script>
 <!-- Floating Next Chapter Button (appears near end, vertical mode only) -->
-  <script>
-  (function(){
-    'use strict';
-    const doc = document;
-    let modeGetter = () => {
-      try {
-        if (window.ReaderState && typeof window.ReaderState.getMode === 'function') return window.ReaderState.getMode();
-      } catch(e){}
-      // Fallbacks
-      const p = new URLSearchParams(location.search).get('vert');
-      if (p === 'true') return 'vertical';
-      if (p === 'false') return 'horizontal';
-      if (doc.body && doc.body.classList.contains('vertical-mode')) return 'vertical';
-      return (localStorage.getItem('InkWell:isVertical') === 'true') ? 'vertical' : 'horizontal';
-    };
-
-    function callNextChapter(){
-      if (typeof window.nextChapter === 'function') return window.nextChapter();
-      if (typeof window.goToNextChapter === 'function') return window.goToNextChapter();
-      if (typeof window.loadChapter === 'function' && typeof window.currentChapterIndex !== 'undefined'){
-        return window.loadChapter(window.currentChapterIndex + 1);
-      }
-      // Fallback event
-      window.dispatchEvent(new CustomEvent('inkwell:next-chapter'));
-    }
-
-    let fab = doc.getElementById('inkwell-next-fab');
-    if (!fab){
-      // Should not happen since we inserted HTML above, but be defensive
-      fab = doc.createElement('button');
-      fab.id = 'inkwell-next-fab';
-      fab.textContent = 'Next ›';
-      doc.body.appendChild(fab);
-    }
-
-    let dismissedUntilAway = false;
-    let longPressTimer = null;
-
-    const showFab = () => { if (!dismissedUntilAway) fab.classList.add('show'); };
-    const hideFab = () => fab.classList.remove('show');
-
-    // Click: advance
-    fab.addEventListener('click', (e) => {
-      // If user clicked the little dismiss '✕', just dismiss
-      if (e.target && e.target.classList && e.target.classList.contains('dismiss')){
-        dismissedUntilAway = true;
-        hideFab();
-        return;
-      }
-      callNextChapter();
-      dismissedUntilAway = true;
-      hideFab();
-    });
-
-    // Long-press anywhere on the FAB to dismiss until moving away from bottom
-    const startLP = () => { longPressTimer = setTimeout(() => { dismissedUntilAway = true; hideFab(); }, 600); };
-    const endLP = () => { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } };
-    ['pointerdown','touchstart','mousedown'].forEach(ev => fab.addEventListener(ev, startLP, {passive:true}));
-    ['pointerup','pointercancel','touchend','touchcancel','mouseup','mouseleave'].forEach(ev => fab.addEventListener(ev, endLP, {passive:true}));
-
-    // Track distance-to-bottom; show FAB when <= 320px, hide when farther.
-    let lastShown = false;
-    const NEAR_PX = 320;
-
-    function distToBottom(){
-      const el = doc.scrollingElement || doc.documentElement;
-      return Math.max(0, el.scrollHeight - (el.scrollTop + el.clientHeight));
-    }
-
-    function onScroll(){
-      if (modeGetter() !== 'vertical') { hideFab(); return; }
-      const d = distToBottom();
-      const shouldShow = (d <= NEAR_PX);
-      if (dismissedUntilAway && d > NEAR_PX + 40){ // small hysteresis before re-arming
-        dismissedUntilAway = false;
-      }
-      if (shouldShow && !dismissedUntilAway) showFab();
-      else hideFab();
-    }
-
-    // Re-run on resize/content changes
-    window.addEventListener('scroll', onScroll, {passive:true});
-    window.addEventListener('resize', onScroll, {passive:true});
-    // If your reader fires a chapter-loaded event, re-arm
-    window.addEventListener('inkwell:chapter-loaded', () => { dismissedUntilAway = false; onScroll(); });
-    window.addEventListener('reader:chapterLoaded', () => { dismissedUntilAway = false; onScroll(); });
-
-    // Initial run after DOM
-    if (doc.readyState === 'loading'){
-      doc.addEventListener('DOMContentLoaded', onScroll, { once: true });
-    } else {
-      onScroll();
-    }
-
-    // Expose minimal API
-    window.InkWellNextFab = {
-      show: () => { dismissedUntilAway = false; showFab(); },
-      hide: hideFab,
-      rearm: () => { dismissedUntilAway = false; onScroll(); }
-    };
-  })();
-  </script>
-<button id="inkwell-next-fab" type="button" aria-label="Next chapter" title="Next">Next</button>
 <script>
-// InkWell Next Chapter FAB + auto-advance (vertical mode only)
 (function(){
   'use strict';
-  const log = (...a)=>{ try{ console.log('[NextFAB]', ...a);}catch{} };
+  const doc = document;
 
-  function isVertical(){
-    try {
-      const url = new URL(window.location.href);
-      if (url.searchParams.get('vert') === 'true') return true;
-      if (document.body.classList.contains('vertical-mode')) return true;
-      const persisted = localStorage.getItem('InkWell:isVertical');
-      return persisted === 'true';
-    } catch { return false; }
+  function getMode(){
+    try { if (window.ReaderState && typeof window.ReaderState.getMode === 'function') return window.ReaderState.getMode(); } catch(e){}
+    const p = new URLSearchParams(location.search).get('vert');
+    if (p === 'true') return 'vertical';
+    if (p === 'false') return 'horizontal';
+    if (doc.body && doc.body.classList.contains('vertical-mode')) return 'vertical';
+    return (localStorage.getItem('InkWell:isVertical') === 'true') ? 'vertical' : 'horizontal';
   }
 
-  function findContainer(){
-    const ids = ['#chapter-container','#content','#reader','main','body'];
-    for (const sel of ids){
-      const el = document.querySelector(sel);
-      if (el) return el;
+  if (getMode() !== 'vertical') return;
+
+  // Create FAB
+  let fab = doc.getElementById('inkwell-next-fab');
+  if (!fab){
+    fab = doc.createElement('button');
+    fab.id = 'inkwell-next-fab';
+    fab.textContent = 'Next';
+    doc.body.appendChild(fab);
+  }
+
+  // Basic pill styling
+  const style = doc.createElement('style');
+  style.textContent = `
+    #inkwell-next-fab {
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      z-index: 10000;
+      display: none;
+      padding: 10px 18px;
+      border-radius: 999px;
+      border: 1px solid rgba(0,0,0,.15);
+      background: #111;
+      color: #fff;
+      font: 600 15px/1 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      box-shadow: 0 6px 18px rgba(0,0,0,.25);
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
     }
-    return document.body;
-  }
+    #inkwell-next-fab.show { display: inline-flex; align-items:center; justify-content:center; }
+    #inkwell-next-fab:active { transform: translateY(1px); }
+  `;
+  doc.head.appendChild(style);
 
-  function callAdvance(){
+  const showFab = () => fab.classList.add('show');
+  const hideFab = () => fab.classList.remove('show');
+
+  function callNextChapter(){
     if (typeof window.nextChapter === 'function') return window.nextChapter();
     if (typeof window.goToNextChapter === 'function') return window.goToNextChapter();
-    const guessIdx = (window.currentChapterIndex ?? window.chap ?? window.chapter ?? 0) + 1;
-    if (typeof window.loadChapter === 'function') return window.loadChapter(guessIdx, 'start');
-    document.dispatchEvent(new CustomEvent('inkwell:next-chapter', { detail: { via: 'fab' } }));
-    log('Dispatched fallback event "inkwell:next-chapter".');
-  }
-
-  function ensureFab(){
-    let btn = document.getElementById('inkwell-next-fab');
-    if (!btn){
-      btn = document.createElement('button');
-      btn.id = 'inkwell-next-fab';
-      btn.type = 'button';
-      btn.textContent = 'Next';
-      btn.setAttribute('aria-label','Next chapter');
-      btn.title = 'Next';
-      document.body.appendChild(btn);
+    if (typeof window.loadChapter === 'function' && typeof window.currentChapterIndex !== 'undefined'){
+      return window.loadChapter(window.currentChapterIndex + 1);
     }
-    if (!btn.__inkwellBound){
-      btn.addEventListener('click', callAdvance, { passive: true });
-      btn.addEventListener('touchstart', function(e){ e.stopPropagation(); }, { passive: true });
-      btn.__inkwellBound = true;
-    }
-    return btn;
+    window.dispatchEvent(new CustomEvent('inkwell:next-chapter'));
   }
 
-  let observer, dwellTimer = null;
-  function armObserver(){
-    const container = findContainer();
-    const fab = ensureFab();
-    let sentinel = document.getElementById('inkwell-bottom-sentinel');
-    if (!sentinel){
-      sentinel = document.createElement('div');
-      sentinel.id = 'inkwell-bottom-sentinel';
-      sentinel.style.cssText = 'height:1px;width:100%;';
-      container.appendChild(sentinel);
-    } else {
-      container.appendChild(sentinel);
-    }
-    if (observer) observer.disconnect();
+  fab.addEventListener('click', callNextChapter);
 
-    observer = new IntersectionObserver((entries)=>{
-      const entry = entries[0];
-      if (!entry) return;
-      if (entry.isIntersecting){
-        fab.classList.add('is-visible');
-        if (dwellTimer) clearTimeout(dwellTimer);
-        dwellTimer = setTimeout(()=>{
-          log('Bottom reached — advancing to next chapter…');
-          callAdvance();
-        }, 300);
-      } else {
-        fab.classList.remove('is-visible');
-        if (dwellTimer){ clearTimeout(dwellTimer); dwellTimer = null; }
-      }
-    }, { root: null, threshold: 0, rootMargin: '320px 0px 0px 0px' });
-
-    observer.observe(sentinel);
+  // Show FAB when near bottom (no auto-advance)
+  const NEAR_PX = 320;
+  function distToBottom(){
+    const el = doc.scrollingElement || doc.documentElement;
+    return Math.max(0, el.scrollHeight - (el.scrollTop + el.clientHeight));
   }
-
-  window.InkWellNextFab = {
-    rearm: armObserver,
-    show(){ ensureFab().classList.add('is-visible'); },
-    hide(){ ensureFab().classList.remove('is-visible'); }
-  };
-
-  function init(){
-    if (!isVertical()){
-      const btn = document.getElementById('inkwell-next-fab');
-      if (btn) btn.classList.remove('is-visible');
-      return;
-    }
-    armObserver();
+  function onScroll(){
+    const d = distToBottom();
+    if (d <= NEAR_PX) showFab(); else hideFab();
   }
+  doc.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
 
-  window.addEventListener('inkwell:chapter-loaded', ()=> setTimeout(armObserver, 50));
-  window.addEventListener('reader:chapterLoaded', ()=> setTimeout(armObserver, 50));
-  const mo = new MutationObserver(()=>{});
-  mo.observe(document.documentElement, { childList:true, subtree:true });
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init, { once:true });
-  } else {
-    init();
-  }
+  window.InkWellNextFab = { show: showFab, hide: hideFab, rearm: onScroll };
 })();
 </script>
 </body>
@@ -2781,36 +2637,5 @@ document.addEventListener('error', function (e) {
     padding: 0 2px;
   }
   #inkwell-next-fab:active { transform: translateY(1px); }
-</style>
-<style>
-/* InkWell Next FAB (pill) */
-#inkwell-next-fab {
-  position: fixed;
-  right: 16px;
-  bottom: 16px;
-  padding: 10px 18px;
-  border-radius: 9999px;
-  border: 0;
-  background: #111;
-  color: #fff;
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: .2px;
-  box-shadow: 0 8px 24px rgba(0,0,0,.25);
-  cursor: pointer;
-  user-select: none;
-  -webkit-tap-highlight-color: transparent;
-  transform: translateY(12px);
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity .18s ease, transform .18s ease, visibility .18s;
-  z-index: 99999;
-}
-#inkwell-next-fab.is-visible {
-  opacity: 1;
-  visibility: visible;
-  transform: translateY(0);
-}
-#inkwell-next-fab:active { transform: translateY(1px); }
 </style>
 </head></html>
