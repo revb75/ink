@@ -31,47 +31,8 @@ withUser(async (uid) => {
 (function(){
   const SUPABASE_URL = window.INKWELL_SUPABASE_URL || 'https://hrxkqvifqawrnpzokome.supabase.co';
   const SUPABASE_ANON_KEY = window.INKWELL_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhyeGtxdmlmcWF3cm5wem9rb21lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcxNzQ0MDIsImV4cCI6MjA2Mjc1MDQwMn0.UZVhGweJEQBxqtrp37G77YmAefQWZYDGzdk1lyj4ua4';
-  if (window.__inkwell_inline_supa) return;
-  window.__inkwell_inline_supa = true;
-  (async () => {
-    try {
-      if (window.supabase?.auth) {
-        document.dispatchEvent(new CustomEvent('supabase:ready', { detail:{ reused:true } }));
-        return;
-      }
-      let mod;
-      try { mod = await import('/js/vendor/supabase-js@2.mjs'); }
-      catch(e1){
-        try { mod = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'); }
-        catch(e2){ mod = await import('https://unpkg.com/@supabase/supabase-js@2/+esm'); }
-      }
-      const { createClient } = mod;
-      const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-        auth: {
-          persistSession: true,
-          autoRefreshToken: true,
-          detectSessionInUrl: true,
-          storage: window.localStorage,
-          storageKey: 'inkwell-auth'
-        }
-      });
-      window.supabase = client;
-      // Recover magic-link tokens if present and clean the URL
-      try {
-        const u = new URL(location.href);
-        const at = u.searchParams.get('access_token');
-        const rt = u.searchParams.get('refresh_token');
-        if (at && rt) { await client.auth.setSession({ access_token: at, refresh_token: rt }); }
-        ['access_token','refresh_token','expires_in','token_type'].forEach(k => u.searchParams.delete(k));
-        history.replaceState(null, '', u.toString());
-      } catch {}
-      document.dispatchEvent(new CustomEvent('supabase:ready', { detail:{ reused:false } }));
-      console.log('✅ Supabase (inline) ready');
-    } catch(e){
-      console.error('[InkWell] Inline Supabase bootstrap failed', e);
-    }
-  })();
-})();
+  
+
 </script>
 
 
@@ -608,122 +569,8 @@ a[class*="next"][class*="chapter"] {
 }
 @media (max-width:420px){ #page-indicator{ font-size:.72rem; } }
 </style>
-<script type="module">
-  import { createClient } from 'https://esm.sh/@supabase/supabase-js@2?bundle';
-
-  const SUPA_URL = 'https://hrxkqvifqawrnpzokome.supabase.co';
-  const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhyeGtxdmlmcWF3cm5wem9rb21lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcxNzQ0MDIsImV4cCI6MjA2Mjc1MDQwMn0.UZVhGweJEQBxqtrp37G77YmAefQWZYDGzdk1lyj4ua4';
-
-  const supabase = createClient(SUPA_URL, SUPA_KEY);
-  window.supabase = supabase;
-
-  console.log('✅ Supabase client initialized and attached to window');
-
-  const { data: { session } } = await supabase.auth.getSession();
-  if (session) {
-    console.log("✅ User is logged in:", session.user.email);
-  } else {
-    console.log("❌ No session found – user not logged in");
-  }
-
-let swipeStartX = null, swipeStartY = null, swipeStartTime = null;
-let SWIPE_THRESHOLD_PX = 40;     // comfortable distance
-let SWIPE_MIN_VELOCITY = 0.25;   // px per ms (~250 px/s)
-
-function isHorizontalMode() {
-  const b = document.body.classList;
-  // Swipe navigation only when paginated, not vertical, and NOT during highlight mode
-  return b.contains('paginated-mode') && !b.contains('vertical-mode') && !b.contains('highlight-mode');
-}
 
 
-function withinEdgeShield(x) {
-  if(window.SWIPE_DISABLED) return;
-  const edge = 24; // px
-  return (x <= edge) || (x >= window.innerWidth - edge);
-}
-
-// Edge shields: swallow first touch so iOS doesn't trigger back/forward
-document.querySelectorAll('.edge-shield').forEach(el => {
-  el.addEventListener('touchstart', (ev) => { ev.preventDefault(); ev.stopPropagation(); }, { passive:false });
-});
-
-reader.addEventListener('touchstart', e => {
-  if (!isHorizontalMode()) return;
-  if (e.touches.length !== 1) return;
-  const t = e.touches[0];
-  swipeStartX = t.clientX;
-  swipeStartY = t.clientY;
-  swipeStartTime = Date.now();
-  // If the gesture begins at the extreme edges, prevent iOS back/forward
-  if (withinEdgeShield(swipeStartX)) {
-    e.preventDefault();
-    e.stopPropagation();
-  }
-}, { passive:false });
-
-reader.addEventListener('touchend', e => {
-  if (!isHorizontalMode()) return;
-  if (swipeStartX == null) return;
-  const t = e.changedTouches[0];
-  const dx = t.clientX - swipeStartX;
-  const dy = t.clientY - swipeStartY;
-  const dt = Math.max(1, Date.now() - swipeStartTime);
-  const absX = Math.abs(dx), absY = Math.abs(dy);
-  const velocityX = dx / dt; // px per ms
-
-  // Only consider mostly-horizontal gestures
-  if (absX < absY) { swipeStartX = swipeStartY = null; return; }
-
-  // Decide navigation with distance OR velocity
-  if (absX >= SWIPE_THRESHOLD_PX || Math.abs(velocityX) >= SWIPE_MIN_VELOCITY) {
-    if (dx < 0) {
-      next(); // right->left => next
-    } else if (dx > 0 && swipeStartX > 30) {
-      prev(); // left->right => prev (ignore left-edge to avoid browser back)
-    }
-  }
-
-  swipeStartX = swipeStartY = null;
-}, { passive:true });
-
-// Expose a tuner if you want to adjust sensitivity at runtime
-window.setSwipeComfort = (percent /* 0..100 */) => {
-  SWIPE_THRESHOLD_PX = 60 - (percent * 0.4);   // 60..20
-  SWIPE_MIN_VELOCITY  = 0.40 - (percent * 0.0025); // 0.40..0.15
-  localStorage.setItem('inkwell_swipe_prefs', JSON.stringify({
-    threshold: SWIPE_THRESHOLD_PX, minVel: SWIPE_MIN_VELOCITY
-  }));
-};
-
-// Load saved preferences
-try {
-  const p = JSON.parse(localStorage.getItem('inkwell_swipe_prefs') || '{}');
-  if (Number.isFinite(p.threshold)) SWIPE_THRESHOLD_PX = p.threshold;
-  if (Number.isFinite(p.minVel)) SWIPE_MIN_VELOCITY = p.minVel;
-} catch {}
-
-let lastPage = -1;
-function updateVerticalPageDisplay() {
-  if(window.SWIPE_DISABLED) return;
-  const container = verticalMode ? document.getElementById('reader') : document.getElementById('chapter-container');
-  const scrollTop = container.scrollTop;
-  const visibleHeight = window.innerHeight;
-  console.log(`🔍 scrollTop: ${container.scrollTop} | clientHeight: ${container.clientHeight} | scrollHeight: ${container.scrollHeight}`);
-  const page = Math.floor(scrollTop / visibleHeight) + 1;
-  if (page !== lastPage) {
-    lastPage = page;
-    const chapter = window.currentChapter ?? 0;
-    console.log(`📖 Saving vertical progress: Chapter ${chapter}, Page ${page}`);
-  }
-  const totalPages = Math.ceil(container.scrollHeight / visibleHeight);
-  const pageDisplay = document.getElementById('page-display');
-  if (pageDisplay) pageDisplay.textContent = `Pg${page} / ${totalPages}`;
-  // Optional: report last page seen to analytics/payout logic
-  window.currentPage = page;
-  window.totalPages = totalPages;
-}
-</script>
 <script type="module">
 </script>
 <div id="toolbar" style="width:100%; display:flex; justify-content:space-between; align-items:center; padding: 0 8px; box-sizing:border-box;">
@@ -925,7 +772,7 @@ const { data:{ session } } = await window.supabase.auth.getSession();
 const { error } = await window.supabase.from('reading_progress').upsert({
   user_id: uid, book_id: bookId, chapter_index: chIndex,
   page_number: pg, book_slug: slug, recorded_at: new Date().toISOString()
-}, { onConflict:['user_id','book_slug'] });
+}, { onConflict:['user_id','book_id'] });
 if (error && error.code !== '409') console.error('Save progress failed', error);
     }
 
@@ -1042,7 +889,7 @@ if (error && error.code !== '409') console.error('Save progress failed', error);
       // Strip TOC links (only for actual TOC/contents chapters)
       try {
         const isTOC = /(?:^|\/)(?:toc|contents)\.(?:x?html|xml)$/i.test(path) ||
-                      !!doc.querySelector('nav[role="doc-toc"], nav[epub\:type~="toc"], nav#toc, nav.toc, #toc, .toc');
+                      !!doc.querySelector('nav[role="doc-toc"], nav[epub\\:type~="toc"], nav#toc, nav.toc, #toc, .toc');
         if (isTOC) {
           wrap.querySelectorAll('a').forEach(link => {
             const span = document.createElement('span');
@@ -1324,6 +1171,9 @@ if (error && error.code !== '409') console.error('Save progress failed', error);
       window.__chapterMeta = chapterMeta;
       document.dispatchEvent(new Event('reader:ready'));
     }
+// expose initReader globally for external callers
+window.initReader = initReader;
+
 
     /* Expose functions for external scripts */
     window.updateUI = updateUI;
@@ -1574,7 +1424,7 @@ body.theme-dark #font-panel .switch input:checked + .slider{background:#1f73c9}
 
       if (libBtn) {
         libBtn.addEventListener('click', ()=> {
-          window.location.href = 'https://ink-eta.vercel.app//library.html';
+          window.location.href = 'library.html';
         });
       }
 
