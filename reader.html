@@ -2581,6 +2581,99 @@ document.addEventListener('error', function (e) {
   });
 })();
 </script>
+<!-- ========== PILL (top-right) ========== -->
+<style>
+  #pill{
+    position:fixed; top:12px; right:12px; z-index:2147483647;
+    padding:10px 14px; border-radius:9999px; background:#111; color:#fff;
+    font:600 14px/1 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
+    border:1px solid rgba(0,0,0,.18); box-shadow:0 6px 18px rgba(0,0,0,.28);
+    cursor:pointer; user-select:none; -webkit-tap-highlight-color:transparent;
+  }
+  #pill:active{ transform: translateY(1px); }
+</style>
+<button id="pill" type="button" title="Toggle vertical">Mode</button>
+
+<script>
+// Minimal, ES5-safe
+(function(){
+  // ---- helpers ----
+  function getVert(){
+    try { return new URL(location.href).searchParams.get('vert') === 'true'; }
+    catch(e){ return false; }
+  }
+  function setVert(nextBool){
+    try {
+      var u = new URL(location.href);
+      u.searchParams.set('vert', nextBool ? 'true' : 'false'); // keep *all* other params (book, chapter, etc.)
+      history.replaceState(null, '', u.toString() + location.hash);
+    } catch(e){
+      // Hard fallback if URL API missing
+      var qs = location.search.replace(/([?&])vert=[^&]*/,'').replace(/^[?]&/,'?');
+      location.search = (qs ? qs + '&' : '?') + 'vert='+(nextBool?'true':'false');
+    }
+  }
+
+  // ---- wrap your existing setMode so it STOPs nuking the chapter ----
+  (function wrapSetMode(){
+    var orig = window.setMode;
+    if (typeof orig !== 'function') return;
+    window.setMode = function(vert){
+      // swallow any destructive replaceState inside original setMode
+      var saved = history.replaceState;
+      history.replaceState = function(){ /* noop during original */ };
+      try { orig.call(this, vert); } catch(_) {}
+      history.replaceState = saved;
+      // do a safe replace that preserves current chapter & params
+      setVert(!!vert);
+    };
+  })();
+
+  // ---- PILL binding ----
+  function syncLabel(btn){ btn.textContent = getVert() ? 'Vert On' : 'Vert Off'; }
+  document.addEventListener('DOMContentLoaded', function(){
+    var pill = document.getElementById('pill');
+    if (!pill) { console.error('❌ pill element missing'); return; }
+    syncLabel(pill);
+    pill.addEventListener('click', function(){
+      var next = !getVert();
+      if (typeof window.setMode === 'function') window.setMode(next);
+      else setVert(next);
+      syncLabel(pill);
+    }, false);
+  });
+
+  // ---- TOC hard-nav (preserve vert), beats SPA preventDefault ----
+  // Update these selectors if your TOC container uses a different one.
+  var TOC_SELECTORS = ['#toc','nav.toc','nav[role="navigation"]','.toc'];
+  function findTOC(){
+    for (var i=0;i<TOC_SELECTORS.length;i++){
+      var el = document.querySelector(TOC_SELECTORS[i]);
+      if (el) return el;
+    }
+    return null;
+  }
+  var toc = findTOC();
+  if (toc){
+    toc.addEventListener('click', function(e){
+      var n = e.target;
+      while (n && n.tagName !== 'A') n = n.parentNode; // nearest <a>
+      if (!n) return;
+      var href = n.getAttribute('href'); if (!href) return;
+      try {
+        var dest = new URL(href, location.href);
+        if (getVert()) dest.searchParams.set('vert','true'); else dest.searchParams.delete('vert');
+        e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+        location.href = dest.toString(); // force real navigation
+      } catch(_) {
+        // If URL fails, let browser do default
+      }
+    }, true); // capture phase
+  } else {
+    console.warn('TOC container not found. If yours uses a different selector, set TOC_SELECTORS accordingly.');
+  }
+})();
+</script>
 
 </body>
 <script>
