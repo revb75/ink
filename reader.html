@@ -2371,38 +2371,41 @@ document.addEventListener('error', function (e) {
 
 
 
-<!-- SAFE-INJECT v4: strict-compatible, tap-anywhere synth, no '||' chains -->
+
+<!-- SAFE-INJECT v5: Shadow pill (near-end) + StorageHack advance -->
 <script>
 (function(){
   var d=document;
   function onReady(fn){ if(d.readyState!=='loading') fn(); else d.addEventListener('DOMContentLoaded', fn, {once:true}); }
   onReady(function(){
     try{
-      // Host (fixed, top-right) + Shadow button
+      // Host (fixed, top-right)
       var host=d.createElement('div');
       host.id='np-host'; host.style.position='fixed';
       host.style.top='calc(var(--toolbar-h,48px) + env(safe-area-inset-top,0px) + 12px)';
       host.style.right='calc(env(safe-area-inset-right,0px) + 12px)';
       host.style.zIndex='2147483647'; host.style.pointerEvents='auto'; host.style.display='none';
       d.body.appendChild(host);
+
+      // Shadow pill
       var sr=host.attachShadow({mode:'open'});
       var style=d.createElement('style');
       style.textContent=':host{all:initial}button{all:unset;display:inline-flex;align-items:center;justify-content:center;padding:10px 16px;border-radius:999px;border:1px solid rgba(0,0,0,.15);background:#111;color:#fff;font:600 14px/1 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;box-shadow:0 6px 18px rgba(0,0,0,.25);cursor:pointer;-webkit-tap-highlight-color:transparent}button:active{transform:translateY(1px)}';
-      var btn=d.createElement('button'); btn.id='pill'; btn.textContent='Next';
+      var btn=d.createElement('button'); btn.textContent='Next';
       sr.append(style, btn);
 
-      // Find scroller
+      // Scroller
       function getScroller(){
         var el=d.getElementById('reader');
         if(!el) el=d.querySelector('[data-role="reader"]');
         if(!el) el=d.querySelector('.reader');
         if(!el) el=d.querySelector('main');
-        if(!el) el=d.scrollingElement||d.documentElement;
+        if(!el) el=d.scrollingElement ? d.scrollingElement : d.documentElement;
         return el;
       }
       var scroller=getScroller();
 
-      // Show near last 10% (IO + fallback)
+      // Show near last ~10% (IO + fallback)
       var io=null;
       function ensureSentinel(){
         var s=scroller.querySelector('#np-sentinel');
@@ -2416,10 +2419,10 @@ document.addEventListener('error', function (e) {
           if(io) io.disconnect();
           io=new IntersectionObserver(function(entries){
             var e=entries&&entries[0];
-            if(e&&e.isIntersecting) host.style.display='block'; else host.style.display='none';
+            if(e && e.isIntersecting) host.style.display='block'; else host.style.display='none';
           }, { root:(scroller===(d.scrollingElement||d.documentElement))?null:scroller, rootMargin:'0px 0px -10% 0px', threshold:0 });
           io.observe(s);
-        }catch(e){ /* older browsers: scroll fallback only */ }
+        }catch(e){ /* fallback only */ }
       }
       function onScroll(){
         var max=scroller.scrollHeight - scroller.clientHeight;
@@ -2431,63 +2434,149 @@ document.addEventListener('error', function (e) {
       window.addEventListener('resize', onScroll);
       bindIO(); onScroll();
 
-      // Click: synthesize right-edge click on document + scroller, then keyboard + bottom scroll
+      // Bypass gate
       function bypassSwipe(){
-        try{ Object.defineProperty(window,'SWIPE_DISABLED',{configurable:true,get:function(){return false;},set:function(){}}); }catch(e){ window.SWIPE_DISABLED=false; }
+        try{ Object.defineProperty(window,'SWIPE_DISABLED',{configurable:true,get:function(){return false;},set:function(){}}); }catch(_){ window.SWIPE_DISABLED=false; }
       }
-      function fireMouse(target, type, x, y){
-        try{ target.dispatchEvent(new MouseEvent(type,{bubbles:true,cancelable:true,clientX:x,clientY:y,view:window})); }catch(_){}
-      }
-      function firePointer(target, type, x, y){
-        try{ target.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,clientX:x,clientY:y,view:window})); }catch(_){}
-      }
-      function fireTouch(target, x, y){
-        try{
-          var t=new Touch({identifier:Date.now(), target:target, clientX:x, clientY:y});
-          var te=new TouchEvent('touchend',{bubbles:true,cancelable:true,changedTouches:[t]});
-          target.dispatchEvent(te);
-        }catch(_){}
-      }
-      function synthTapAt(x, y){
-        var tList=[d.elementFromPoint(x,y), scroller, d.body, d.documentElement];
-        for(var i=0;i<tList.length;i++){
-          var t=tList[i]; if(!t) continue;
-          firePointer(t,'pointerdown',x,y); fireMouse(t,'mousedown',x,y);
-          firePointer(t,'pointerup',x,y);   fireMouse(t,'mouseup',x,y); fireMouse(t,'click',x,y);
-          fireTouch(t,x,y);
-        }
-      }
+
+      // Try a bunch of signals
       function keyRight(){ try{ window.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',code:'ArrowRight',keyCode:39,which:39,bubbles:true})); }catch(_){ } }
       function forceBottom(){ try{ scroller.scrollTop=scroller.scrollHeight; }catch(_){ } }
       function signalCustom(){ try{ window.dispatchEvent(new CustomEvent('inkwell:next-chapter')); }catch(_){ } }
+      function tapViewportRight(){
+        var vw = window.innerWidth;  if(!vw) vw = d.documentElement.clientWidth;
+        var vh = window.innerHeight; if(!vh) vh = d.documentElement.clientHeight;
+        if(!vw) vw = 1024; if(!vh) vh = 768;
+        var x = vw - 6, y = Math.floor(vh*0.5);
+        try{ d.elementFromPoint(x,y)?.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,clientX:x,clientY:y,view:window})); }catch(_){}
+      }
+      function tapExplicitZone(){
+        var tap = d.querySelector('.edge-shield.right');
+        if(!tap) tap = d.getElementById('rightTapZone');
+        if(!tap) tap = d.querySelector('[data-role="tap-right"]');
+        if(!tap) return;
+        try{
+          var r=tap.getBoundingClientRect();
+          var tx = r.left + Math.max(4, Math.floor(r.width*0.9)); if(tx>r.right-4) tx=r.right-4;
+          var ty = r.top + Math.max(4, Math.floor(r.height*0.5)); if(ty>r.bottom-4) ty=r.bottom-4;
+          tap.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,clientX:tx,clientY:ty,view:window}));
+        }catch(_){ try{ tap.click(); }catch(e){} }
+      }
+
+      // StorageHack: discover progress keys, bump chapter, reload
+      function bumpStoredChapter(){
+        var stores=[localStorage, sessionStorage];
+        var bumped=false, changes=0;
+        for(var s=0; s<stores.length; s++){
+          var store=stores[s];
+          try{
+            for(var i=0; i<store.length; i++){
+              var k=store.key(i);
+              if(!k) continue;
+              // Prefer likely keys
+              var isLikely = /progress|state|reader|inkwell|chapter|chapidx|chapindex|vertical/i.test(k);
+              if(!isLikely) continue;
+              var raw=store.getItem(k);
+              if(!raw) continue;
+
+              // JSON object?
+              var obj=null, parsed=false;
+              if (raw.charAt(0)==='{' || raw.charAt(0)==='['){
+                try{ obj=JSON.parse(raw); parsed=true; }catch(_){ obj=null; }
+              }
+
+              function bumpInObj(o){
+                var did=false;
+                if(!o || typeof o!=='object') return false;
+                // common patterns
+                var keys=['chapter','Chapter','chapterIndex','currentChapterIndex','chap','index','idx'];
+                for(var j=0;j<keys.length;j++){
+                  var key=keys[j];
+                  if(Object.prototype.hasOwnProperty.call(o,key) && typeof o[key]==='number'){
+                    o[key]=o[key]+1; did=true;
+                  }
+                }
+                // nested vertical progress
+                if(!did && o.vertical && typeof o.vertical==='object'){
+                  var vk=['chapter','index','idx'];
+                  for(var j2=0;j2<vk.length;j2++){
+                    var kk=vk[j2];
+                    if(Object.prototype.hasOwnProperty.call(o.vertical,kk) && typeof o.vertical[kk]==='number'){
+                      o.vertical[kk]=o.vertical[kk]+1; did=true;
+                    }
+                  }
+                }
+                return did;
+              }
+
+              if(parsed){
+                if(bumpInObj(obj)){
+                  try{ store.setItem(k, JSON.stringify(obj)); bumped=true; changes++; }catch(_){}
+                }
+              } else {
+                // Non-JSON but maybe "C:0,P:12" or similar
+                var m = raw.match(/(chapter|chap|idx|index)\s*[:=]\s*(\d+)/i);
+                if(m){
+                  var num=parseInt(m[2],10);
+                  if(!isNaN(num)){
+                    var next=String(num+1);
+                    var newv=raw.replace(m[0], m[1]+': '+next);
+                    try{ store.setItem(k, newv); bumped=true; changes++; }catch(_){}
+                  }
+                }
+              }
+            }
+          }catch(_){}
+        }
+        if(bumped){
+          try{ location.reload(); }catch(_){ }
+        }
+        return bumped;
+      }
+
+      function forceAdvance(){
+        // 1) try UI signals first
+        bypassSwipe();
+        tapViewportRight();
+        tapExplicitZone();
+        keyRight();
+        forceBottom();
+        signalCustom();
+
+        // 2) Storage hack if UI didn’t trigger
+        setTimeout(function(){
+          var ok=bumpStoredChapter();
+          if(!ok){
+            // last resort: add chapter param and reload
+            try{
+              var url=new URL(location.href);
+              var names=['chapter','chap','ch','c','index','i','part','p'];
+              var used=null, val=null;
+              for(var z=0; z<names.length; z++){
+                var nm=names[z];
+                if(url.searchParams.has(nm)){
+                  var raw=url.searchParams.get(nm);
+                  var num=parseInt(raw,10);
+                  if(!isNaN(num)){ used=nm; val=num; break; }
+                }
+              }
+              if(used===null){
+                used='chapter'; val=0;
+              }
+              url.searchParams.set(used, String(val+1));
+              location.href = url.toString();
+            }catch(e){}
+          }
+        }, 120);
+      }
 
       btn.addEventListener('click', function(){
         host.style.display='none';
-        bypassSwipe();
-        var vw = (window.innerWidth||d.documentElement.clientWidth||1024);
-        var vh = (window.innerHeight||d.documentElement.clientHeight||768);
-        var x  = Math.max(1, vw - 8);
-        var y  = Math.max(1, Math.floor(vh * 0.5));
-        // 1) synthesize a right-edge tap broadly
-        synthTapAt(x, y);
-        // 2) try a right-edge overlay if present
-        var tap = d.querySelector('.edge-shield.right, #rightTapZone, [data-role="tap-right"]');
-        if (tap){
-          var r = tap.getBoundingClientRect();
-          var tx = Math.min(r.right-4, r.left + Math.max(4, Math.floor(r.width*0.9)));
-          var ty = r.top + Math.min(r.height-4, Math.max(4, Math.floor(r.height*0.5)));
-          synthTapAt(tx, ty);
-        }
-        // 3) keyboard & bottom scroll
-        keyRight();
-        forceBottom();
-        // 4) final custom event
-        signalCustom();
-        // Re-evaluate after layout
-        setTimeout(onScroll, 160);
+        forceAdvance();
+        setTimeout(onScroll, 200);
       }, {passive:true});
     }catch(e){
-      console.error('[SAFE-INJECT v4] failed:', e);
+      console.error('[SAFE-INJECT v5]', e);
     }
   });
 })();
