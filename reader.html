@@ -2188,17 +2188,33 @@ document.addEventListener('error', function (e) {
 <!-- Floating Next Chapter Button (appears near end, vertical mode only) -->
 <!-- removed old next button script -->
 <!-- removed old next button script -->
-<style id="nextpill-style">
-/* disable tap shields only while pill visible */
-html.nextpill-active .edge-shield { display: none !important; pointer-events: none !important; }
+
+
+
+
+<style id="nextpill-style-debug">
+/* Debug panel */
+#np-debug {
+  position: fixed;
+  left: 8px; top: 8px;
+  background: rgba(0,0,0,.75);
+  color: #0ff;
+  font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  padding: 8px 10px;
+  border-radius: 8px;
+  z-index: 2147483647;
+  white-space: pre;
+  pointer-events: auto;
+}
+#np-debug button{ margin-left: 6px; padding: 2px 6px; font: inherit; }
 </style>
-<script id="nextpill-script">
+<script id="nextpill-script-debug">
 (function(){
   'use strict';
   const d = document;
-  const LOG = (...a)=>console.debug('[NextPill]', ...a);
+  const log = (...a)=>console.debug('[NP-DBG]', ...a);
 
-  /* helpers */
+  /* ---------- helpers ---------- */
   function isVertical(){
     try { if (window.ReaderState && typeof ReaderState.getMode==='function') return ReaderState.getMode()==='vertical'; } catch(e){}
     const p = new URLSearchParams(location.search).get('vert');
@@ -2207,11 +2223,28 @@ html.nextpill-active .edge-shield { display: none !important; pointer-events: no
   }
   function getScroller(){
     if (!isVertical()) return d.scrollingElement || d.documentElement;
-    const r = d.getElementById('reader') || d.querySelector('[data-role=\"reader\"], .reader, main');
+    const r = d.getElementById('reader') || d.querySelector('[data-role="reader"], .reader, main');
     return r || (d.scrollingElement || d.documentElement);
   }
 
-  /* host + shadow */
+  /* ---------- debug panel ---------- */
+  function ensurePanel(){
+    let p = d.getElementById('np-debug');
+    if (!p){
+      p = d.createElement('div');
+      p.id = 'np-debug';
+      p.innerHTML = 'NP debug\\n<span id=\"np-lines\"></span> <button id=\"np-show\">Show</button> <button id=\"np-hide\">Hide</button> <button id=\"np-force\">Force 5s</button>';
+      d.body.appendChild(p);
+      p.querySelector('#np-show').onclick = ()=> pillShow(true);
+      p.querySelector('#np-hide').onclick = ()=> pillHide(true);
+      p.querySelector('#np-force').onclick = ()=> { pillShow(true); setTimeout(()=>pillSticky=true, 0); setTimeout(()=>{ pillSticky=false; refresh(); }, 5000); };
+    }
+    return p;
+  }
+  const panel = ensurePanel();
+  const linesEl = panel.querySelector('#np-lines');
+
+  /* ---------- shadow pill host ---------- */
   function ensureHost(){
     let host = d.getElementById('nextpill-host');
     if (!host){
@@ -2223,13 +2256,15 @@ html.nextpill-active .edge-shield { display: none !important; pointer-events: no
       host.style.zIndex = '2147483647';
       host.style.pointerEvents = 'auto';
       host.style.display = 'none';
+      host.style.contain = 'paint'; /* isolate stacking */
+      host.style.transform = 'translateZ(0)'; /* own layer */
       d.body.appendChild(host);
-    } else if (host !== d.body.lastElementChild) {
+    } else if (host !== d.body.lastElementChild){
       d.body.appendChild(host);
     }
     return host;
   }
-  function ensureButton(host){
+  function ensurePill(host){
     if (!host.shadowRoot){
       const sr = host.attachShadow({mode:'open'});
       const style = d.createElement('style');
@@ -2237,78 +2272,86 @@ html.nextpill-active .edge-shield { display: none !important; pointer-events: no
         :host{ all: initial; }
         button {
           all: unset;
-          display: inline-flex; align-items: center; justify-content: center;
-          padding: 10px 16px; border-radius: 999px;
-          border: 1px solid rgba(0,0,0,.15);
-          background: #111; color: #fff;
-          font: 600 14px/1 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-          box-shadow: 0 6px 18px rgba(0,0,0,.25);
-          cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;
+          display:inline-flex; align-items:center; justify-content:center;
+          padding:10px 16px; border-radius:999px;
+          border:1px solid rgba(0,0,0,.15);
+          background:#111; color:#fff;
+          font:600 14px/1 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+          box-shadow:0 6px 18px rgba(0,0,0,.25);
+          cursor:pointer; user-select:none; -webkit-tap-highlight-color:transparent;
         }
-        button:active { transform: translateY(1px); }
+        button:active{ transform: translateY(1px); }
       `;
       const btn = d.createElement('button');
       btn.id = 'pill'; btn.textContent = 'Next';
-      btn.addEventListener('click', onClick, { passive:true });
+      btn.addEventListener('click', onClick, {passive:true});
       sr.append(style, btn);
     }
     return host.shadowRoot.getElementById('pill');
   }
 
-  /* sentinel near-end detection */
-  let scroller=null, io=null, host=null;
+  /* ---------- visibility: sticky once shown until click/chapter change ---------- */
+  let scroller=null, io=null, host=null, pillSticky=false;
+
   function ensureSentinel(el){
     if (!el) return null;
     let s = el.querySelector('#nextpill-sentinel');
     if (!s){
       s = d.createElement('div');
       s.id = 'nextpill-sentinel';
-      s.style.width='1px'; s.style.height='1px';
-      s.style.opacity='0'; s.style.pointerEvents='none';
+      Object.assign(s.style, { width:'1px', height:'1px', opacity:'0', pointerEvents:'none' });
       el.appendChild(s);
     } else if (s !== el.lastElementChild){
       el.appendChild(s);
     }
     return s;
   }
-  function show(){ if (host && host.style.display!=='block'){ host.style.display='block'; d.documentElement.classList.add('nextpill-active'); } }
-  function hide(){ if (host && host.style.display!=='none'){ host.style.display='none'; d.documentElement.classList.remove('nextpill-active'); } }
-  function bind(){
-    host = ensureHost(); ensureButton(host);
-    const el = getScroller();
-    if (el !== scroller){
-      scroller = el;
-      if (io){ try{ io.disconnect(); }catch(e){} io=null; }
-      const s = ensureSentinel(scroller);
-      if (s){
-        io = new IntersectionObserver((entries)=>{
-          const e = entries && entries[0];
-          if (!isVertical()){ hide(); return; }
-          if (e && e.isIntersecting) show(); else hide();
-        }, {
-          root: (scroller === (d.scrollingElement || d.documentElement)) ? null : scroller,
-          rootMargin: '0px 0px -10% 0px',
-          threshold: 0
-        });
-        io.observe(s);
-      }
-    }
+  function pillShow(manual=false){ host.style.display='block'; d.documentElement.classList.add('nextpill-active'); if(manual) pillSticky=true; }
+  function pillHide(manual=false){ host.style.display='none'; d.documentElement.classList.remove('nextpill-active'); if(manual) pillSticky=false; }
+
+  function refresh(){
+    const el = scroller || getScroller();
+    // Fallback by scroll fraction too
+    const max = Math.max(1, el.scrollHeight - el.clientHeight);
+    const frac = max ? el.scrollTop / max : 0;
+    const nearEnd = frac >= 0.90; // 90% fallback
+    if (!isVertical()){ if (!pillSticky) pillHide(); return; }
+    if (pillSticky || nearEnd || lastIOVisible) pillShow(); else pillHide();
+    updatePanel();
   }
 
-  /* click: bypass SWIPE_DISABLED and advance via chain */
-  function withSwipeEnabled(fn){
-    const had = Object.prototype.hasOwnProperty.call(window,'SWIPE_DISABLED');
-    const prev = window.SWIPE_DISABLED;
-    try {
-      Object.defineProperty(window, 'SWIPE_DISABLED', { configurable:true, get(){ return false; }, set(){} });
-    } catch(_) { window.SWIPE_DISABLED = false; }
-    try { return fn(); } finally {
-      try {
-        if (had) Object.defineProperty(window, 'SWIPE_DISABLED', { configurable:true, value: prev });
-        else delete window.SWIPE_DISABLED;
-      } catch(_) { window.SWIPE_DISABLED = prev || false; }
-    }
+  // IO near-end
+  let lastIOVisible = false;
+  function bindIO(){
+    if (io){ try{io.disconnect();}catch(e){} io=null; }
+    const s = ensureSentinel(scroller);
+    if (!s) return;
+    io = new IntersectionObserver((entries)=>{
+      const e = entries && entries[0];
+      lastIOVisible = !!(e && e.isIntersecting);
+      refresh();
+    }, {
+      root: (scroller === (d.scrollingElement || d.documentElement)) ? null : scroller,
+      rootMargin: '0px 0px -10% 0px',
+      threshold: 0
+    });
+    io.observe(s);
   }
+
+  // Bind to scroller
+  function bind(){
+    host = ensureHost(); ensurePill(host);
+    const el = getScroller();
+    if (el !== scroller){
+      if (scroller) scroller.removeEventListener('scroll', refresh, {passive:true});
+      scroller = el;
+      scroller.addEventListener('scroll', refresh, {passive:true});
+      bindIO();
+    }
+    refresh();
+  }
+
+  /* ---------- click advance ---------- */
   function advance(){
     const chain = [
       () => window.nextChapter && window.nextChapter(),
@@ -2324,19 +2367,52 @@ html.nextpill-active .edge-shield { display: none !important; pointer-events: no
     try { window.dispatchEvent(new CustomEvent('inkwell:next-chapter')); } catch(e){}
   }
   function onClick(){
-    hide();
-    withSwipeEnabled(advance);
+    pillSticky=false;
+    pillHide();
+    advance();
     setTimeout(bind, 120);
   }
 
-  /* lifecycle */
+  /* ---------- overlay detection (is something covering it?) ---------- */
+  function cssPath(el){
+    if (!el) return '(none)';
+    if (el.id) return '#'+el.id;
+    let s = el.tagName.toLowerCase();
+    if (el.className && typeof el.className === 'string') s += '.'+el.className.trim().split(/\\s+/).join('.');
+    return s;
+  }
+  function detectCover(){
+    // check element under the pill center
+    const rect = host.getBoundingClientRect();
+    const x = rect.right - rect.width/2;
+    const y = rect.top + rect.height/2;
+    const topEl = d.elementFromPoint(x, y);
+    const cover = topEl && topEl !== host && topEl !== host.shadowRoot?.host ? topEl : null;
+    return cover ? { path: cssPath(cover), z: getComputedStyle(cover).zIndex, pe: getComputedStyle(cover).pointerEvents } : null;
+  }
+
+  function updatePanel(){
+    const el = scroller || getScroller();
+    const cs = getComputedStyle(host);
+    const cover = detectCover();
+    const info = [
+      `vert=${isVertical()} scroller=${(el.id||el.tagName)} IO=${lastIOVisible}`,
+      `scrollTop=${el.scrollTop} client=${el.clientHeight} scrollH=${el.scrollHeight}`,
+      `host display=${cs.display} z=${cs.zIndex} pe=${cs.pointerEvents}`,
+      cover ? `COVER path=${cover.path} z=${cover.z} pe=${cover.pe}` : 'COVER (none)',
+      `sticky=${pillSticky}`,
+    ].join('\\n');
+    linesEl.textContent = info;
+  }
+
+  // Lifecycle
   const rebind = ()=>bind();
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', rebind); else rebind();
   window.addEventListener('resize', rebind);
   window.addEventListener('orientationchange', rebind);
   document.addEventListener('reader:ready', rebind);
   document.addEventListener('chapter:changed', rebind);
-  new MutationObserver(()=>rebind()).observe(d.documentElement, { childList:true, subtree:true });
+  new MutationObserver(()=>rebind()).observe(document.documentElement, { childList:true, subtree:true });
 })();
 </script>
 
