@@ -2255,7 +2255,16 @@ document.addEventListener('error', function (e) {
 <!-- removed conflicting script -->
 <style>
 /* Clean Next pill (top-right, safe-area aware) */
-#nextFab {
+/* removed old nextFab styles */
+#nextFab:active { transform: translateY(1px); }
+</style>
+
+<!-- removed old next-pill script -->
+
+
+<style>
+/* --- NEXT PILL (clean) --- */
+#next-pill {
   position: fixed;
   top: calc(var(--toolbar-h, 48px) + env(safe-area-inset-top, 0px) + 10px);
   right: calc(env(safe-area-inset-right, 0px) + 12px);
@@ -2271,9 +2280,11 @@ document.addEventListener('error', function (e) {
   display: none;
   z-index: 10010;
 }
-#nextFab:active { transform: translateY(1px); }
-</style>
+#next-pill:active { transform: translateY(1px); }
 
+/* When pill is visible, disable tap zones (edge shields). */
+html.next-pill-active .edge-shield { display: none !important; pointer-events: none !important; }
+</style>
 <script>
 (function(){
   'use strict';
@@ -2287,7 +2298,7 @@ document.addEventListener('error', function (e) {
     const p = new URLSearchParams(location.search).get('vert');
     if (p === 'true') return true;
     if (p === 'false') return false;
-    return (localStorage.getItem('InkWell:isVertical') === 'true');
+    return (localStorage.getItem('InkWell:isVertical') === 'true') || doc.body.classList.contains('vertical-mode');
   }
 
   function getScroller(){
@@ -2296,30 +2307,35 @@ document.addEventListener('error', function (e) {
     return r || (doc.scrollingElement || doc.documentElement);
   }
 
-  // Create once
-  let fab = doc.getElementById('nextFab');
-  if (!fab){
-    fab = doc.createElement('button');
-    fab.id = 'nextFab';
-    fab.type = 'button';
-    fab.textContent = 'Next';
-    doc.body.appendChild(fab);
+  // Create pill once
+  let pill = doc.getElementById('next-pill');
+  if (!pill){
+    pill = doc.createElement('button');
+    pill.id = 'next-pill';
+    pill.type = 'button';
+    pill.textContent = 'Next';
+    doc.body.appendChild(pill);
   }
 
-  // Show/hide in last 10% of scroller
+  // Show only near end (last 10% of scrollable height)
   const THRESHOLD = 0.10;
   let scroller = null;
 
   function remainingFraction(el){
     const total = Math.max(1, el.scrollHeight);
     const seen = el.scrollTop + el.clientHeight;
-    return Math.max(0, (total - seen) / total);
+    const remaining = Math.max(0, total - seen);
+    if (total <= el.clientHeight + 2) return 1; // not scrollable -> don't show
+    return remaining / total;
   }
+
+  function show(){ if (pill.style.display !== 'inline-flex'){ pill.style.display = 'inline-flex'; doc.documentElement.classList.add('next-pill-active'); } }
+  function hide(){ if (pill.style.display !== 'none'){ pill.style.display = 'none'; doc.documentElement.classList.remove('next-pill-active'); } }
 
   function onScroll(){
     const el = scroller || getScroller();
     const rem = remainingFraction(el);
-    fab.style.display = (isVertical() && rem <= THRESHOLD) ? 'inline-flex' : 'none';
+    if (isVertical() && rem <= THRESHOLD) show(); else hide();
   }
 
   function bind(){
@@ -2331,6 +2347,11 @@ document.addEventListener('error', function (e) {
     onScroll();
   }
 
+  // MutationObserver: rebind when #reader appears/changes
+  const mo = new MutationObserver(()=>bind());
+  mo.observe(doc.documentElement, { childList: true, subtree: true });
+
+  // Click behavior: temporarily re-enable tap zones, click right zone if available, else fallbacks, then restore default
   function clickRightTapZone(){
     const rightTap = doc.querySelector('.edge-shield.right, #rightTapZone, [data-role="tap-right"]');
     if (rightTap){ try { rightTap.click(); return true; } catch(_){} }
@@ -2350,16 +2371,16 @@ document.addEventListener('error', function (e) {
     try { window.dispatchEvent(new CustomEvent('inkwell:next-chapter')); } catch(_) {}
   }
 
-  fab.addEventListener('click', () => {
+  pill.addEventListener('click', () => {
+    // Restore default tap zones before triggering the next action
+    doc.documentElement.classList.remove('next-pill-active');
+    hide();
     if (!clickRightTapZone()) nextFallback();
+    // After a beat, allow the UI to settle back
+    setTimeout(() => { onScroll(); }, 50);
   });
 
-  // Re-enable tap zones in case any style disabled them
-  doc.querySelectorAll('.edge-shield').forEach(el => {
-    el.style.display = ''; el.style.pointerEvents = '';
-  });
-
-  // Bind lifecycle
+  // Lifecycle
   doc.addEventListener('DOMContentLoaded', bind);
   window.addEventListener('resize', bind);
   window.addEventListener('orientationchange', bind);
