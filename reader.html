@@ -2440,6 +2440,154 @@ document.addEventListener('error', function (e) {
 })();
 </script>
 
+
+<!-- SAFE-INJECT v2: Robust Next pill with multi-fallback click -->
+<script>
+(() => {
+  const d = document;
+  function ready(fn){ if (d.readyState !== 'loading') fn(); else d.addEventListener('DOMContentLoaded', fn, {once:true}); }
+  ready(() => {
+    try {
+      // Host (fixed, top-right)
+      const host = d.createElement('div');
+      host.id = 'np-host';
+      Object.assign(host.style, {
+        position: 'fixed',
+        top: 'calc(var(--toolbar-h, 48px) + env(safe-area-inset-top,0px) + 12px)',
+        right: 'calc(env(safe-area-inset-right,0px) + 12px)',
+        zIndex: '2147483647',
+        pointerEvents: 'auto',
+        display: 'none' // hidden until near end
+      });
+      d.body.appendChild(host);
+
+      // Shadow DOM
+      const sr = host.attachShadow({mode:'open'});
+      const style = d.createElement('style');
+      style.textContent = `
+        :host{ all: initial; }
+        button {
+          all: unset;
+          display: inline-flex; align-items: center; justify-content: center;
+          padding: 10px 16px; border-radius: 999px;
+          border: 1px solid rgba(0,0,0,.15);
+          background: #111; color: #fff;
+          font: 600 14px/1 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+          box-shadow: 0 6px 18px rgba(0,0,0,.25);
+          cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;
+        }
+        button:active { transform: translateY(1px); }
+      `;
+      const btn = d.createElement('button');
+      btn.id = 'pill';
+      btn.textContent = 'Next';
+      sr.append(style, btn);
+
+      // Helpers
+      const scroller = d.getElementById('reader') || d.querySelector('[data-role="reader"], .reader, main') || d.scrollingElement || d.documentElement;
+      function show(){ host.style.display = 'block'; }
+      function hide(){ host.style.display = 'none'; }
+
+      // Robust "tap-right" synthesizer
+      function synthClick(el){
+        if (!el) return false;
+        const r = el.getBoundingClientRect();
+        const x = Math.min(r.right - 4, r.left + Math.max(4, r.width * 0.9));
+        const y = r.top + Math.min(r.height - 4, Math.max(4, r.height * 0.5));
+        const opts = {bubbles:true, cancelable:true, clientX:x, clientY:y, view:window};
+        try {
+          el.dispatchEvent(new PointerEvent('pointerdown', opts));
+          el.dispatchEvent(new MouseEvent('mousedown', opts));
+          el.dispatchEvent(new PointerEvent('pointerup', opts));
+          el.dispatchEvent(new MouseEvent('mouseup', opts));
+          el.dispatchEvent(new MouseEvent('click', opts));
+          return true;
+        } catch(_) {
+          try { el.click(); return true; } catch(e){}
+        }
+        return false;
+      }
+
+      function keyNav(){
+        const ev = new KeyboardEvent('keydown', {key:'ArrowRight', code:'ArrowRight', keyCode:39, which:39, bubbles:true});
+        return window.dispatchEvent(ev);
+      }
+
+      function advance(){
+        const chain = [
+          () => { const t=d.querySelector('.edge-shield.right, #rightTapZone, [data-role="tap-right"]'); if (t) return synthClick(t); },
+          () => window.nextChapter && window.nextChapter(),
+          () => window.goToNextChapter && window.goToNextChapter(),
+          () => window.goNext && window.goNext(),
+          () => window.next && window.next(),
+          () => window.turnPage && window.turnPage(1),
+          () => (typeof window.loadChapter==='function') && window.loadChapter(((window.currentChapterIndex ?? window.chapterIndex ?? (window.ReaderState && typeof ReaderState.getChapterIndex==='function' && ReaderState.getChapterIndex())) || 0) + 1),
+          () => keyNav(),
+          () => { scroller.scrollTop = scroller.scrollHeight; return true; }, // force bottom
+          () => (window.dispatchEvent(new CustomEvent('inkwell:next-chapter')), true),
+        ];
+        for (const fn of chain){
+          try { const r = fn(); if (r !== undefined) return r; } catch(_) {}
+        }
+      }
+
+      btn.addEventListener('click', () => {
+        hide();
+        advance();
+        setTimeout(onScroll, 120); // re-eval
+      }, {passive:true});
+
+      // Near-end detection: IO sentinel + scroll fallback
+      let io = null;
+      function ensureSentinel(){
+        let s = scroller.querySelector('#np-sentinel');
+        if (!s){
+          s = d.createElement('div');
+          s.id = 'np-sentinel';
+          s.style.width = '1px';
+          s.style.height = '1px';
+          s.style.opacity = '0';
+          s.style.pointerEvents = 'none';
+          scroller.appendChild(s);
+        } else if (s !== scroller.lastElementChild){
+          scroller.appendChild(s);
+        }
+        return s;
+      }
+
+      function bindIO(){
+        try {
+          const s = ensureSentinel();
+          if (io) io.disconnect();
+          io = new IntersectionObserver((entries)=>{
+            const e = entries && entries[0];
+            if (e && e.isIntersecting) show(); else hide();
+          }, {
+            root: (scroller === (d.scrollingElement || d.documentElement)) ? null : scroller,
+            rootMargin: '0px 0px -10% 0px',
+            threshold: 0
+          });
+          io.observe(s);
+        } catch(e){ /* IO not available; fallback to scroll fraction only */ }
+      }
+
+      function onScroll(){
+        const max = Math.max(1, scroller.scrollHeight - scroller.clientHeight);
+        const frac = max ? scroller.scrollTop / max : 0;
+        if (frac >= 0.90) show(); else hide();
+      }
+
+      scroller.addEventListener('scroll', onScroll, {passive:true});
+      window.addEventListener('resize', onScroll);
+      bindIO();
+      onScroll();
+    } catch (e) {
+      console.error('[SAFE-INJECT v2] failed:', e);
+    }
+  });
+})();
+</script>
+
 </body>
 <script>
 // Dynamically keep --toolbar-h in sync with actual toolbar height (safe for iOS browser chrome changes)
