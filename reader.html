@@ -2588,6 +2588,150 @@ document.addEventListener('error', function (e) {
 })();
 </script>
 
+
+<!-- SAFE-INJECT v3: Force-next (no return-value dependence, timed sequence) -->
+<script>
+(() => {
+  const d = document;
+  function ready(fn){ if (d.readyState !== 'loading') fn(); else d.addEventListener('DOMContentLoaded', fn, {once:true}); }
+  ready(() => {
+    try {
+      const host = d.createElement('div');
+      host.id = 'np-host';
+      Object.assign(host.style, {
+        position: 'fixed',
+        top: 'calc(var(--toolbar-h, 48px) + env(safe-area-inset-top,0px) + 12px)',
+        right: 'calc(env(safe-area-inset-right,0px) + 12px)',
+        zIndex: '2147483647',
+        pointerEvents: 'auto',
+        display: 'none'
+      });
+      d.body.appendChild(host);
+
+      const sr = host.attachShadow({mode:'open'});
+      const style = d.createElement('style');
+      style.textContent = `
+        :host{ all: initial; }
+        button {
+          all: unset;
+          display: inline-flex; align-items: center; justify-content: center;
+          padding: 10px 16px; border-radius: 999px;
+          border: 1px solid rgba(0,0,0,.15);
+          background: #111; color: #fff;
+          font: 600 14px/1 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+          box-shadow: 0 6px 18px rgba(0,0,0,.25);
+          cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;
+        }
+        button:active { transform: translateY(1px); }
+      `;
+      const btn = d.createElement('button');
+      btn.id = 'pill';
+      btn.textContent = 'Next';
+      sr.append(style, btn);
+
+      const scroller = d.getElementById('reader') || d.querySelector('[data-role="reader"], .reader, main') || d.scrollingElement || d.documentElement;
+      function show(){ host.style.display = 'block'; }
+      function hide(){ host.style.display = 'none'; }
+
+      function synthClick(el){
+        if (!el) return;
+        const r = el.getBoundingClientRect();
+        const x = Math.min(r.right - 4, r.left + Math.max(4, r.width * 0.9));
+        const y = r.top + Math.min(r.height - 4, Math.max(4, r.height * 0.5));
+        const opts = {bubbles:true, cancelable:true, clientX:x, clientY:y, view:window};
+        try {
+          el.dispatchEvent(new PointerEvent('pointerdown', opts));
+          el.dispatchEvent(new MouseEvent('mousedown', opts));
+          el.dispatchEvent(new PointerEvent('pointerup', opts));
+          el.dispatchEvent(new MouseEvent('mouseup', opts));
+          el.dispatchEvent(new MouseEvent('click', opts));
+        } catch(_) { try { el.click(); } catch(e){} }
+      }
+      function keyRight(){
+        try {
+          window.dispatchEvent(new KeyboardEvent('keydown', {key:'ArrowRight', code:'ArrowRight', keyCode:39, which:39, bubbles:true}));
+        } catch(e){}
+      }
+      function bypassSwipe(block=true){
+        try { Object.defineProperty(window, 'SWIPE_DISABLED', { configurable:true, get(){ return block?false:false; }, set(){} }); }
+        catch(_){ window.SWIPE_DISABLED = false; }
+      }
+
+      function forceNextSequence(){
+        // 0) ensure guards won't block
+        bypassSwipe(true);
+        // 1) try right tap zone
+        const tap = d.querySelector('.edge-shield.right, #rightTapZone, [data-role="tap-right"]');
+        synthClick(tap);
+        // 2) call all known functions (do not rely on return)
+        try { window.nextChapter && window.nextChapter(); } catch(_){}
+        try { window.goToNextChapter && window.goToNextChapter(); } catch(_){}
+        try { window.goNext && window.goNext(); } catch(_){}
+        try { window.next && window.next(); } catch(_){}
+        try { window.turnPage && window.turnPage(1); } catch(_){}
+        try { if (typeof window.loadChapter==='function'){ 
+            const idx = (window.currentChapterIndex ?? window.chapterIndex ?? (window.ReaderState && typeof ReaderState.getChapterIndex==='function' && ReaderState.getChapterIndex()) || 0) + 1;
+            window.loadChapter(idx);
+        }} catch(_){}
+        // 3) send keyboard fallback
+        keyRight();
+        // 4) scroll to bottom in case an auto-watcher is present
+        try { scroller.scrollTop = scroller.scrollHeight; } catch(_){}
+        // 5) final signal
+        try { window.dispatchEvent(new CustomEvent('inkwell:next-chapter')); } catch(_){}
+        // 6) restore guard
+        setTimeout(()=>bypassSwipe(false), 200);
+      }
+
+      btn.addEventListener('click', () => {
+        hide();
+        forceNextSequence();
+        setTimeout(onScroll, 160);
+      }, {passive:true});
+
+      // near end detection
+      let io=null;
+      function ensureSentinel(){
+        let s = scroller.querySelector('#np-sentinel');
+        if (!s){
+          s = d.createElement('div');
+          s.id = 'np-sentinel';
+          Object.assign(s.style, {width:'1px', height:'1px', opacity:'0', pointerEvents:'none'});
+          scroller.appendChild(s);
+        } else if (s !== scroller.lastElementChild){ scroller.appendChild(s); }
+        return s;
+      }
+      function bindIO(){
+        try {
+          const s = ensureSentinel();
+          if (io) io.disconnect();
+          io = new IntersectionObserver((entries)=>{
+            const e = entries && entries[0];
+            if (e && e.isIntersecting) show(); else hide();
+          }, {
+            root: (scroller === (d.scrollingElement || d.documentElement)) ? null : scroller,
+            rootMargin: '0px 0px -10% 0px',
+            threshold: 0
+          });
+          io.observe(s);
+        } catch(e){ /* fallback only */ }
+      }
+      function onScroll(){
+        const max = Math.max(1, scroller.scrollHeight - scroller.clientHeight);
+        const frac = max ? scroller.scrollTop / max : 0;
+        host.style.display = frac >= 0.90 ? 'block' : 'none';
+      }
+      scroller.addEventListener('scroll', onScroll, {passive:true});
+      window.addEventListener('resize', onScroll);
+      bindIO();
+      onScroll();
+    } catch (e) {
+      console.error('[SAFE-INJECT v3] failed:', e);
+    }
+  });
+})();
+</script>
+
 </body>
 <script>
 // Dynamically keep --toolbar-h in sync with actual toolbar height (safe for iOS browser chrome changes)
