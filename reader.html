@@ -2332,21 +2332,52 @@ document.addEventListener('error', function (e) {
   fab.addEventListener('click', callNextChapter);
 
   // Show FAB when near bottom by percentage (last 10%)
-  const THRESHOLD = 0.10; // show in last 10% of chapter height
-  function progressToEnd(){
-    const el = doc.scrollingElement || doc.documentElement;
+  const THRESHOLD = 0.10; // show only in last 10% of the chapter
+
+  function getScrollContainer(){
+    // Prefer the app's reader scroller in vertical mode
+    try {
+      if (getMode() === 'vertical') {
+        const r = doc.getElementById('reader') || doc.querySelector('[data-role="reader"], .reader, main');
+        if (r && (getComputedStyle(r).overflowY === 'auto' || getComputedStyle(r).overflowY === 'scroll')) return r;
+      }
+    } catch(e){}
+    // Fallback to document scrolling element
+    return doc.scrollingElement || doc.documentElement;
+  }
+
+  let scroller = null;
+  function bindScroll(){
+    const el = getScrollContainer();
+    if (el === scroller) return;
+    if (scroller) scroller.removeEventListener('scroll', onScroll, { passive: true });
+    scroller = el;
+    if (!scroller) return;
+    scroller.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+  }
+
+  function remainingFraction(el){
     const total = Math.max(1, el.scrollHeight);
     const seen = el.scrollTop + el.clientHeight;
     return Math.max(0, (total - seen) / total);
   }
+
   function onScroll(){
-    const rem = progressToEnd();
+    if (getMode() !== 'vertical') { hideFab(); return; }
+    const el = scroller || getScrollContainer();
+    const rem = remainingFraction(el);
     if (rem <= THRESHOLD) showFab(); else hideFab();
   }
-  doc.addEventListener('scroll', onScroll, { passive: true });
-  onScroll();
 
-  window.InkWellNextFab = { show: showFab, hide: hideFab, rearm: onScroll };
+  // Re-bind when DOM changes size or orientation changes (common on mobile)
+  const rebind = () => { setTimeout(bindScroll, 0); };
+  doc.addEventListener('DOMContentLoaded', rebind);
+  window.addEventListener('resize', rebind);
+  window.addEventListener('orientationchange', rebind);
+  bindScroll();
+
+  window.InkWellNextFab = { show: showFab, hide: hideFab, rearm: bindScroll }; = { show: showFab, hide: hideFab, rearm: onScroll };
 })();
 </script>
 <script>
