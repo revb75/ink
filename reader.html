@@ -71,11 +71,11 @@ html, body {
 #quiet-btn.active { background: rgba(0,0,0,.08); }
 
 /* === OVERRIDE: Remove non-working under-toolbar CTA bar === */
-#next-cta-bar, #next-cta-bar * { display: none !important; }
+/* removed old next-cta-bar styles */
 
 
 /* === OVERRIDE: Move FAB to top-right below toolbar (safe-area aware) === */
-/* removed inkwell-next-fab styles */
+/* removed old inkwell-next-fab styles */
 
 </style>
 <meta charset="utf-8"/>
@@ -439,24 +439,89 @@ body.theme-dark #reader ::selection {
 
 
 /* Floating '' button: safe-area aware, never overlaps toolbar */
-/* removed next-chapter-btn styles */
-/* removed next-chapter-btn styles */
-/* removed next-chapter-btn styles */
+#next-chapter-btn {
+  position: fixed;
+  right: 12px;
+  bottom: calc(var(--toolbar-h) + env(safe-area-inset-bottom, 0px) + 12px);
+  z-index: 2500;
+  padding: 12px 16px;
+  border-radius: 9999px;
+  border: none;
+  background: #1e73ff;
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 6px 18px rgba(0,0,0,.2);
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+  transition: opacity .22s ease, transform .22s ease;
+}
+#next-chapter-btn.show {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+#next-chapter-btn:active { transform: translateY(1px); }
 
 
 /* (disabled) Force bottom-right; neutralize any inherited 'top' */
-/* removed next-chapter-btn styles */
-/* nuker removed by patch */
+#next-chapter-btn {
+  top: auto !important;
+  bottom: calc(var(--toolbar-h) + env(safe-area-inset-bottom, 0px) + 12px) !important;
+  right: 12px !important;
+  left: auto !important;
+}
+/* Nuke any legacy top-right Next buttons that might linger */
+button[aria-label*="" i]:not(#next-chapter-btn),
+a[aria-label*="" i],
+button[class*="next"][class*="chapter"]:not(#next-chapter-btn),
+a[class*="next"][class*="chapter"] {
+  display: none !important;
+  pointer-events: none !important;
+}
+
+
+@media (hover:hover) {
+  #next-chapter-btn:hover { filter: brightness(1.05); }
+}
 
 
 /* Professional, minimal pill button — safe-area aware, above toolbar */
-/* removed next-chapter-btn styles */
-/* removed next-chapter-btn styles */
-/* removed next-chapter-btn styles */
-@media (hover:hover) {
-  /* removed next-chapter-btn styles */
+#next-chapter-btn {
+  position: fixed;
+  inset: auto 14px calc(var(--toolbar-h) + env(safe-area-inset-bottom, 0px) + 14px) auto;
+  z-index: 2500;
+  padding: 12px 16px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(20,20,20,0.72);
+  color: #fff;
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 1;
+  letter-spacing: .2px;
+  box-shadow: 0 10px 24px rgba(0,0,0,.28);
+  -webkit-tap-highlight-color: transparent;
+  backdrop-filter: saturate(120%) blur(4px);
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+  transition: opacity .18s ease, transform .18s ease;
 }
-/* removed next-chapter-btn styles */
+#next-chapter-btn.show {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+#next-chapter-btn:active { transform: translateY(1px); }
+@media (hover:hover) {
+  #next-chapter-btn:hover { filter: brightness(1.06); }
+}
+#next-chapter-btn:focus-visible {
+  outline: 2px solid rgba(255,255,255,0.6);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(255,255,255,0.25), 0 10px 24px rgba(0,0,0,.28);
+}
 
 </style>
 <style id="inkwell-css-override">
@@ -2186,173 +2251,93 @@ document.addEventListener('error', function (e) {
 </script>
 
 <!-- Floating Next Chapter Button (appears near end, vertical mode only) -->
-<!-- removed old next button script -->
-<!-- removed old next button script -->
-
-
-
-
-<style id="nextpill-style-debug">
-/* Debug panel */
-#np-debug {
+<!-- removed conflicting script -->
+<!-- removed conflicting script -->
+<style>
+/* Clean Next pill (top-right, safe-area aware) */
+#nextFab {
   position: fixed;
-  left: 8px; top: 8px;
-  background: rgba(0,0,0,.75);
-  color: #0ff;
-  font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  padding: 8px 10px;
-  border-radius: 8px;
-  z-index: 2147483647;
-  white-space: pre;
-  pointer-events: auto;
+  top: calc(var(--toolbar-h, 48px) + env(safe-area-inset-top, 0px) + 10px);
+  right: calc(env(safe-area-inset-right, 0px) + 12px);
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(0,0,0,.15);
+  background: #111;
+  color: #fff;
+  font: 600 14px/1 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  box-shadow: 0 6px 18px rgba(0,0,0,.25);
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  display: none;
+  z-index: 10010;
 }
-#np-debug button{ margin-left: 6px; padding: 2px 6px; font: inherit; }
+#nextFab:active { transform: translateY(1px); }
 </style>
-<script id="nextpill-script-debug">
+
+<script>
 (function(){
   'use strict';
-  const d = document;
-  const log = (...a)=>console.debug('[NP-DBG]', ...a);
+  const doc = document;
 
-  /* ---------- helpers ---------- */
   function isVertical(){
-    try { if (window.ReaderState && typeof ReaderState.getMode==='function') return ReaderState.getMode()==='vertical'; } catch(e){}
+    try {
+      if (window.ReaderState && typeof window.ReaderState.getMode === 'function')
+        return window.ReaderState.getMode() === 'vertical';
+    } catch(e){}
     const p = new URLSearchParams(location.search).get('vert');
-    if (p==='true') return true; if (p==='false') return false;
-    return d.body.classList.contains('vertical-mode') || localStorage.getItem('InkWell:isVertical')==='true';
+    if (p === 'true') return true;
+    if (p === 'false') return false;
+    return (localStorage.getItem('InkWell:isVertical') === 'true');
   }
+
   function getScroller(){
-    if (!isVertical()) return d.scrollingElement || d.documentElement;
-    const r = d.getElementById('reader') || d.querySelector('[data-role="reader"], .reader, main');
-    return r || (d.scrollingElement || d.documentElement);
+    if (!isVertical()) return doc.scrollingElement || doc.documentElement;
+    const r = doc.getElementById('reader') || doc.querySelector('[data-role="reader"], .reader, main');
+    return r || (doc.scrollingElement || doc.documentElement);
   }
 
-  /* ---------- debug panel ---------- */
-  function ensurePanel(){
-    let p = d.getElementById('np-debug');
-    if (!p){
-      p = d.createElement('div');
-      p.id = 'np-debug';
-      p.innerHTML = 'NP debug\\n<span id=\"np-lines\"></span> <button id=\"np-show\">Show</button> <button id=\"np-hide\">Hide</button> <button id=\"np-force\">Force 5s</button>';
-      d.body.appendChild(p);
-      p.querySelector('#np-show').onclick = ()=> pillShow(true);
-      p.querySelector('#np-hide').onclick = ()=> pillHide(true);
-      p.querySelector('#np-force').onclick = ()=> { pillShow(true); setTimeout(()=>pillSticky=true, 0); setTimeout(()=>{ pillSticky=false; refresh(); }, 5000); };
-    }
-    return p;
-  }
-  const panel = ensurePanel();
-  const linesEl = panel.querySelector('#np-lines');
-
-  /* ---------- shadow pill host ---------- */
-  function ensureHost(){
-    let host = d.getElementById('nextpill-host');
-    if (!host){
-      host = d.createElement('div');
-      host.id = 'nextpill-host';
-      host.style.position = 'fixed';
-      host.style.top = 'calc(var(--toolbar-h, 48px) + env(safe-area-inset-top, 0px) + 10px)';
-      host.style.right = 'calc(env(safe-area-inset-right, 0px) + 12px)';
-      host.style.zIndex = '2147483647';
-      host.style.pointerEvents = 'auto';
-      host.style.display = 'none';
-      host.style.contain = 'paint'; /* isolate stacking */
-      host.style.transform = 'translateZ(0)'; /* own layer */
-      d.body.appendChild(host);
-    } else if (host !== d.body.lastElementChild){
-      d.body.appendChild(host);
-    }
-    return host;
-  }
-  function ensurePill(host){
-    if (!host.shadowRoot){
-      const sr = host.attachShadow({mode:'open'});
-      const style = d.createElement('style');
-      style.textContent = `
-        :host{ all: initial; }
-        button {
-          all: unset;
-          display:inline-flex; align-items:center; justify-content:center;
-          padding:10px 16px; border-radius:999px;
-          border:1px solid rgba(0,0,0,.15);
-          background:#111; color:#fff;
-          font:600 14px/1 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-          box-shadow:0 6px 18px rgba(0,0,0,.25);
-          cursor:pointer; user-select:none; -webkit-tap-highlight-color:transparent;
-        }
-        button:active{ transform: translateY(1px); }
-      `;
-      const btn = d.createElement('button');
-      btn.id = 'pill'; btn.textContent = 'Next';
-      btn.addEventListener('click', onClick, {passive:true});
-      sr.append(style, btn);
-    }
-    return host.shadowRoot.getElementById('pill');
+  // Create once
+  let fab = doc.getElementById('nextFab');
+  if (!fab){
+    fab = doc.createElement('button');
+    fab.id = 'nextFab';
+    fab.type = 'button';
+    fab.textContent = 'Next';
+    doc.body.appendChild(fab);
   }
 
-  /* ---------- visibility: sticky once shown until click/chapter change ---------- */
-  let scroller=null, io=null, host=null, pillSticky=false;
+  // Show/hide in last 10% of scroller
+  const THRESHOLD = 0.10;
+  let scroller = null;
 
-  function ensureSentinel(el){
-    if (!el) return null;
-    let s = el.querySelector('#nextpill-sentinel');
-    if (!s){
-      s = d.createElement('div');
-      s.id = 'nextpill-sentinel';
-      Object.assign(s.style, { width:'1px', height:'1px', opacity:'0', pointerEvents:'none' });
-      el.appendChild(s);
-    } else if (s !== el.lastElementChild){
-      el.appendChild(s);
-    }
-    return s;
+  function remainingFraction(el){
+    const total = Math.max(1, el.scrollHeight);
+    const seen = el.scrollTop + el.clientHeight;
+    return Math.max(0, (total - seen) / total);
   }
-  function pillShow(manual=false){ host.style.display='block'; d.documentElement.classList.add('nextpill-active'); if(manual) pillSticky=true; }
-  function pillHide(manual=false){ host.style.display='none'; d.documentElement.classList.remove('nextpill-active'); if(manual) pillSticky=false; }
 
-  function refresh(){
+  function onScroll(){
     const el = scroller || getScroller();
-    // Fallback by scroll fraction too
-    const max = Math.max(1, el.scrollHeight - el.clientHeight);
-    const frac = max ? el.scrollTop / max : 0;
-    const nearEnd = frac >= 0.90; // 90% fallback
-    if (!isVertical()){ if (!pillSticky) pillHide(); return; }
-    if (pillSticky || nearEnd || lastIOVisible) pillShow(); else pillHide();
-    updatePanel();
+    const rem = remainingFraction(el);
+    fab.style.display = (isVertical() && rem <= THRESHOLD) ? 'inline-flex' : 'none';
   }
 
-  // IO near-end
-  let lastIOVisible = false;
-  function bindIO(){
-    if (io){ try{io.disconnect();}catch(e){} io=null; }
-    const s = ensureSentinel(scroller);
-    if (!s) return;
-    io = new IntersectionObserver((entries)=>{
-      const e = entries && entries[0];
-      lastIOVisible = !!(e && e.isIntersecting);
-      refresh();
-    }, {
-      root: (scroller === (d.scrollingElement || d.documentElement)) ? null : scroller,
-      rootMargin: '0px 0px -10% 0px',
-      threshold: 0
-    });
-    io.observe(s);
-  }
-
-  // Bind to scroller
   function bind(){
-    host = ensureHost(); ensurePill(host);
     const el = getScroller();
-    if (el !== scroller){
-      if (scroller) scroller.removeEventListener('scroll', refresh, {passive:true});
-      scroller = el;
-      scroller.addEventListener('scroll', refresh, {passive:true});
-      bindIO();
-    }
-    refresh();
+    if (scroller === el) return;
+    if (scroller) scroller.removeEventListener('scroll', onScroll, { passive:true });
+    scroller = el;
+    if (scroller) scroller.addEventListener('scroll', onScroll, { passive:true });
+    onScroll();
   }
 
-  /* ---------- click advance ---------- */
-  function advance(){
+  function clickRightTapZone(){
+    const rightTap = doc.querySelector('.edge-shield.right, #rightTapZone, [data-role="tap-right"]');
+    if (rightTap){ try { rightTap.click(); return true; } catch(_){} }
+    return false;
+  }
+
+  function nextFallback(){
     const chain = [
       () => window.nextChapter && window.nextChapter(),
       () => window.goToNextChapter && window.goToNextChapter(),
@@ -2361,58 +2346,97 @@ document.addEventListener('error', function (e) {
       () => window.turnPage && window.turnPage(1),
       () => (typeof window.loadChapter==='function') && window.loadChapter(((window.currentChapterIndex ?? window.chapterIndex ?? (window.ReaderState && typeof ReaderState.getChapterIndex==='function' && ReaderState.getChapterIndex())) || 0) + 1),
     ];
-    for (const fn of chain){
-      try { const r = fn(); if (r !== undefined) return r; } catch(e){}
+    for (const fn of chain){ try { const r = fn(); if (r !== undefined) return r; } catch(_){} }
+    try { window.dispatchEvent(new CustomEvent('inkwell:next-chapter')); } catch(_) {}
+  }
+
+  fab.addEventListener('click', () => {
+    if (!clickRightTapZone()) nextFallback();
+  });
+
+  // Re-enable tap zones in case any style disabled them
+  doc.querySelectorAll('.edge-shield').forEach(el => {
+    el.style.display = ''; el.style.pointerEvents = '';
+  });
+
+  // Bind lifecycle
+  doc.addEventListener('DOMContentLoaded', bind);
+  window.addEventListener('resize', bind);
+  window.addEventListener('orientationchange', bind);
+  bind();
+})();
+</script>
+
+
+<!-- SAFE-INJECT: Minimal Next pill (no removals, no guards) -->
+<script>
+(() => {
+  const d = document;
+  function ready(fn){ if (d.readyState !== 'loading') fn(); else d.addEventListener('DOMContentLoaded', fn, {once:true}); }
+  ready(() => {
+    try {
+      // Host (fixed, top-right)
+      const host = d.createElement('div');
+      host.id = 'np-host';
+      host.style.position = 'fixed';
+      host.style.top = 'calc(var(--toolbar-h, 48px) + env(safe-area-inset-top,0px) + 12px)';
+      host.style.right = 'calc(env(safe-area-inset-right,0px) + 12px)';
+      host.style.zIndex = '2147483647';
+      host.style.pointerEvents = 'auto';
+      host.style.display = 'none'; // hidden until near end
+      d.body.appendChild(host);
+
+      // Shadow DOM for isolation
+      const sr = host.attachShadow({mode:'open'});
+      const style = d.createElement('style');
+      style.textContent = `
+        :host{ all: initial; }
+        button {
+          all: unset;
+          display: inline-flex; align-items: center; justify-content: center;
+          padding: 10px 16px; border-radius: 999px;
+          border: 1px solid rgba(0,0,0,.15);
+          background: #111; color: #fff;
+          font: 600 14px/1 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+          box-shadow: 0 6px 18px rgba(0,0,0,.25);
+          cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;
+        }
+        button:active { transform: translateY(1px); }
+      `;
+      const btn = d.createElement('button');
+      btn.id = 'pill';
+      btn.textContent = 'Next';
+      sr.append(style, btn);
+
+      // Advance chain (no tap-zone deps, no globals changed)
+      function advance(){
+        const chain = [
+          () => window.nextChapter && window.nextChapter(),
+          () => window.goToNextChapter && window.goToNextChapter(),
+          () => window.goNext && window.goNext(),
+          () => window.next && window.next(),
+          () => window.turnPage && window.turnPage(1),
+          () => (typeof window.loadChapter==='function') && window.loadChapter(((window.currentChapterIndex ?? window.chapterIndex ?? (window.ReaderState && typeof ReaderState.getChapterIndex==='function' && ReaderState.getChapterIndex())) || 0) + 1),
+          () => (window.dispatchEvent(new CustomEvent('inkwell:next-chapter')), true),
+        ];
+        for (const fn of chain){ try { const r = fn(); if (r !== undefined) return r; } catch(_){} }
+      }
+      btn.addEventListener('click', advance, {passive:true});
+
+      // Near-end detection (simple scroll fraction fallback)
+      const scroller = d.getElementById('reader') || d.querySelector('[data-role="reader"], .reader, main') || d.scrollingElement || d.documentElement;
+      function onScroll(){
+        const max = Math.max(1, scroller.scrollHeight - scroller.clientHeight);
+        const frac = max ? scroller.scrollTop / max : 0;
+        host.style.display = frac >= 0.90 ? 'block' : 'none'; // show in last 10%
+      }
+      scroller.addEventListener('scroll', onScroll, {passive:true});
+      window.addEventListener('resize', onScroll);
+      onScroll();
+    } catch (e) {
+      console.error('[SAFE-INJECT Next pill] failed:', e);
     }
-    try { window.dispatchEvent(new CustomEvent('inkwell:next-chapter')); } catch(e){}
-  }
-  function onClick(){
-    pillSticky=false;
-    pillHide();
-    advance();
-    setTimeout(bind, 120);
-  }
-
-  /* ---------- overlay detection (is something covering it?) ---------- */
-  function cssPath(el){
-    if (!el) return '(none)';
-    if (el.id) return '#'+el.id;
-    let s = el.tagName.toLowerCase();
-    if (el.className && typeof el.className === 'string') s += '.'+el.className.trim().split(/\\s+/).join('.');
-    return s;
-  }
-  function detectCover(){
-    // check element under the pill center
-    const rect = host.getBoundingClientRect();
-    const x = rect.right - rect.width/2;
-    const y = rect.top + rect.height/2;
-    const topEl = d.elementFromPoint(x, y);
-    const cover = topEl && topEl !== host && topEl !== host.shadowRoot?.host ? topEl : null;
-    return cover ? { path: cssPath(cover), z: getComputedStyle(cover).zIndex, pe: getComputedStyle(cover).pointerEvents } : null;
-  }
-
-  function updatePanel(){
-    const el = scroller || getScroller();
-    const cs = getComputedStyle(host);
-    const cover = detectCover();
-    const info = [
-      `vert=${isVertical()} scroller=${(el.id||el.tagName)} IO=${lastIOVisible}`,
-      `scrollTop=${el.scrollTop} client=${el.clientHeight} scrollH=${el.scrollHeight}`,
-      `host display=${cs.display} z=${cs.zIndex} pe=${cs.pointerEvents}`,
-      cover ? `COVER path=${cover.path} z=${cover.z} pe=${cover.pe}` : 'COVER (none)',
-      `sticky=${pillSticky}`,
-    ].join('\\n');
-    linesEl.textContent = info;
-  }
-
-  // Lifecycle
-  const rebind = ()=>bind();
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', rebind); else rebind();
-  window.addEventListener('resize', rebind);
-  window.addEventListener('orientationchange', rebind);
-  document.addEventListener('reader:ready', rebind);
-  document.addEventListener('chapter:changed', rebind);
-  new MutationObserver(()=>rebind()).observe(document.documentElement, { childList:true, subtree:true });
+  });
 })();
 </script>
 
@@ -2518,18 +2542,14 @@ document.addEventListener('error', function (e) {
     -webkit-tap-highlight-color: transparent;
     user-select: none;
   }
-  #inkwell-next-fab.show { display: inline-flex; }
-  #inkwell-next-fab .icon { font-size: 16px; }
-  #inkwell-next-fab .dismiss {
-    font-size: 16px;
-    opacity: .8;
-    padding: 0 2px;
-  }
-  #inkwell-next-fab:active { transform: translateY(1px); }
+  /* removed old inkwell-next-fab styles */
+  /* removed old inkwell-next-fab styles */
+  /* removed old inkwell-next-fab styles */
+  /* removed old inkwell-next-fab styles */
 </style>
 <!-- removed: vertical-mode edge-shield disable to re-enable tap zones --><style>
 /* Next CTA bar directly below toolbar */
-/* removed next-cta-bar styles */
+/* removed old next-cta-bar styles */
 /* Professional pill button */
 #next-toolbar-btn {
   appearance: none;
@@ -2545,7 +2565,7 @@ document.addEventListener('error', function (e) {
 }
 #next-toolbar-btn:hover { background:#1e40af; }
 /* Only show CTA bar in vertical mode */
-body:not(.vertical-mode) /* removed next-cta-bar styles */
+body:not(.vertical-mode) /* removed old next-cta-bar styles */
 /* Disable side tap zones in vertical mode so they don't steal clicks */
 body/* tap-zones re-enabled: removed vertical-mode edge-shield override */
 </style></head></html>
