@@ -71,11 +71,11 @@ html, body {
 #quiet-btn.active { background: rgba(0,0,0,.08); }
 
 /* === OVERRIDE: Remove non-working under-toolbar CTA bar === */
-/* removed old next-cta-bar styles */
+#next-cta-bar, #next-cta-bar * { display: none !important; }
 
 
 /* === OVERRIDE: Move FAB to top-right below toolbar (safe-area aware) === */
-/* removed old inkwell-next-fab styles */
+/* removed inkwell-next-fab styles */
 
 </style>
 <meta charset="utf-8"/>
@@ -439,8 +439,58 @@ body.theme-dark #reader ::selection {
 
 
 /* Floating '' button: safe-area aware, never overlaps toolbar */
-/* (disabled) Force bottom-right; neutralize any inherited 'top' */
+/* removed next-chapter-btn styles */
+/* removed next-chapter-btn styles */
+/* removed next-chapter-btn styles */
 
+
+/* (disabled) Force bottom-right; neutralize any inherited 'top' */
+/* removed next-chapter-btn styles */
+/* nuker removed by patch */
+
+
+/* Professional, minimal pill button — safe-area aware, above toolbar */
+/* removed next-chapter-btn styles */
+/* removed next-chapter-btn styles */
+/* removed next-chapter-btn styles */
+@media (hover:hover) {
+  /* removed next-chapter-btn styles */
+}
+/* removed next-chapter-btn styles */
+
+</style>
+<style id="inkwell-css-override">
+  .chapter, .page {
+    margin: 0 !important;
+    padding: 1rem !important;
+    box-sizing: border-box !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  .chapter * {
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  body, html {
+    overflow-x: hidden !important;
+  }
+</style>
+<style id="reader-height-override">
+  /* Layered fallbacks for older browsers */
+  #reader {
+    min-height: calc(100vh - var(--toolbar-h)) !important;   /* oldest */
+    min-height: calc(100svh - var(--toolbar-h)) !important;  /* small viewport */
+    min-height: calc(100dvh - var(--toolbar-h)) !important;  /* dynamic viewport (best) */
+  }
+</style>
+<style>
+@keyframes floatUpFade {
+  0% { transform: translateY(0); opacity: 1; }
+  100% { transform: translateY(-100px); opacity: 0; }
+}
 .floating-emoji {
   position: absolute;
   font-size: 2rem;
@@ -2136,71 +2186,32 @@ document.addEventListener('error', function (e) {
 </script>
 
 <!-- Floating Next Chapter Button (appears near end, vertical mode only) -->
-<!-- removed conflicting script -->
-<!-- removed conflicting script -->
-<!-- removed old next button styles -->
-
-<!-- removed old next-pill script -->
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<!-- removed old next-button script -->
-
-
-
-
-<!-- removed old next-button script -->
-
-
 <!-- removed old next button script -->
-
-
 <!-- removed old next button script -->
-
-
-<!-- removed old pill scripts -->
-
-
 <style id="nextpill-style">
-/* Hide tap shields only while pill visible */
+/* disable tap shields only while pill visible */
 html.nextpill-active .edge-shield { display: none !important; pointer-events: none !important; }
 </style>
 <script id="nextpill-script">
 (function(){
   'use strict';
   const d = document;
-  const LOG = (...a)=>console.debug('[NEXTPILL]', ...a);
+  const LOG = (...a)=>console.debug('[NextPill]', ...a);
 
-  /* ---------- helpers ---------- */
-  const isVertical = () => new URLSearchParams(location.search).get('vert') === 'true'
-                        || d.body.classList.contains('vertical-mode');
+  /* helpers */
+  function isVertical(){
+    try { if (window.ReaderState && typeof ReaderState.getMode==='function') return ReaderState.getMode()==='vertical'; } catch(e){}
+    const p = new URLSearchParams(location.search).get('vert');
+    if (p==='true') return true; if (p==='false') return false;
+    return d.body.classList.contains('vertical-mode') || localStorage.getItem('InkWell:isVertical')==='true';
+  }
   function getScroller(){
-    const r = d.getElementById('reader') || d.querySelector('[data-role="reader"], .reader, main');
+    if (!isVertical()) return d.scrollingElement || d.documentElement;
+    const r = d.getElementById('reader') || d.querySelector('[data-role=\"reader\"], .reader, main');
     return r || (d.scrollingElement || d.documentElement);
   }
 
-  /* ---------- host + shadow ---------- */
+  /* host + shadow */
   function ensureHost(){
     let host = d.getElementById('nextpill-host');
     if (!host){
@@ -2210,11 +2221,11 @@ html.nextpill-active .edge-shield { display: none !important; pointer-events: no
       host.style.top = 'calc(var(--toolbar-h, 48px) + env(safe-area-inset-top, 0px) + 10px)';
       host.style.right = 'calc(env(safe-area-inset-right, 0px) + 12px)';
       host.style.zIndex = '2147483647';
-      host.style.display = 'none'; // hidden until near-end
       host.style.pointerEvents = 'auto';
+      host.style.display = 'none';
       d.body.appendChild(host);
-    } else if (host !== d.body.lastElementChild){
-      d.body.appendChild(host); // keep on top
+    } else if (host !== d.body.lastElementChild) {
+      d.body.appendChild(host);
     }
     return host;
   }
@@ -2224,43 +2235,50 @@ html.nextpill-active .edge-shield { display: none !important; pointer-events: no
       const style = d.createElement('style');
       style.textContent = `
         :host{ all: initial; }
-        button { all: unset; box-sizing:border-box;
-          display:inline-flex; align-items:center; justify-content:center;
-          padding:10px 16px; border-radius:999px; border:1px solid rgba(0,0,0,.15);
-          background:#111; color:#fff; font:600 14px/1 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-          box-shadow:0 6px 18px rgba(0,0,0,.25); cursor:pointer; user-select:none; -webkit-tap-highlight-color:transparent; }
+        button {
+          all: unset;
+          display: inline-flex; align-items: center; justify-content: center;
+          padding: 10px 16px; border-radius: 999px;
+          border: 1px solid rgba(0,0,0,.15);
+          background: #111; color: #fff;
+          font: 600 14px/1 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+          box-shadow: 0 6px 18px rgba(0,0,0,.25);
+          cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;
+        }
         button:active { transform: translateY(1px); }
       `;
       const btn = d.createElement('button');
-      btn.id = 'pill';
-      btn.textContent = 'Next';
-      btn.addEventListener('click', onClick, {passive:true});
+      btn.id = 'pill'; btn.textContent = 'Next';
+      btn.addEventListener('click', onClick, { passive:true });
       sr.append(style, btn);
     }
     return host.shadowRoot.getElementById('pill');
   }
 
-  /* ---------- visibility via IntersectionObserver on sentinel ---------- */
-  let scroller = null, io = null, host = null;
+  /* sentinel near-end detection */
+  let scroller=null, io=null, host=null;
   function ensureSentinel(el){
     if (!el) return null;
     let s = el.querySelector('#nextpill-sentinel');
     if (!s){
       s = d.createElement('div');
       s.id = 'nextpill-sentinel';
-      s.style.width = '1px'; s.style.height = '1px'; s.style.opacity = '0'; s.style.pointerEvents = 'none';
+      s.style.width='1px'; s.style.height='1px';
+      s.style.opacity='0'; s.style.pointerEvents='none';
       el.appendChild(s);
-    } else if (s !== el.lastElementChild){ el.appendChild(s); }
+    } else if (s !== el.lastElementChild){
+      el.appendChild(s);
+    }
     return s;
   }
-  function show(){ if (host.style.display !== 'block'){ host.style.display = 'block'; d.documentElement.classList.add('nextpill-active'); } }
-  function hide(){ if (host.style.display !== 'none'){ host.style.display = 'none'; d.documentElement.classList.remove('nextpill-active'); } }
+  function show(){ if (host && host.style.display!=='block'){ host.style.display='block'; d.documentElement.classList.add('nextpill-active'); } }
+  function hide(){ if (host && host.style.display!=='none'){ host.style.display='none'; d.documentElement.classList.remove('nextpill-active'); } }
   function bind(){
     host = ensureHost(); ensureButton(host);
     const el = getScroller();
     if (el !== scroller){
       scroller = el;
-      if (io){ try{io.disconnect();}catch(e){} io=null; }
+      if (io){ try{ io.disconnect(); }catch(e){} io=null; }
       const s = ensureSentinel(scroller);
       if (s){
         io = new IntersectionObserver((entries)=>{
@@ -2268,8 +2286,8 @@ html.nextpill-active .edge-shield { display: none !important; pointer-events: no
           if (!isVertical()){ hide(); return; }
           if (e && e.isIntersecting) show(); else hide();
         }, {
-          root: (scroller === (d.scrollingElement||d.documentElement)) ? null : scroller,
-          rootMargin: '0px 0px -12% 0px',
+          root: (scroller === (d.scrollingElement || d.documentElement)) ? null : scroller,
+          rootMargin: '0px 0px -10% 0px',
           threshold: 0
         });
         io.observe(s);
@@ -2277,7 +2295,7 @@ html.nextpill-active .edge-shield { display: none !important; pointer-events: no
     }
   }
 
-  /* ---------- click: temporarily bypass global block & advance ---------- */
+  /* click: bypass SWIPE_DISABLED and advance via chain */
   function withSwipeEnabled(fn){
     const had = Object.prototype.hasOwnProperty.call(window,'SWIPE_DISABLED');
     const prev = window.SWIPE_DISABLED;
@@ -2298,27 +2316,27 @@ html.nextpill-active .edge-shield { display: none !important; pointer-events: no
       () => window.goNext && window.goNext(),
       () => window.next && window.next(),
       () => window.turnPage && window.turnPage(1),
-      () => (typeof window.loadChapter==='function') && window.loadChapter(((window.chap ?? 0) + 1), 'start'),
+      () => (typeof window.loadChapter==='function') && window.loadChapter(((window.currentChapterIndex ?? window.chapterIndex ?? (window.ReaderState && typeof ReaderState.getChapterIndex==='function' && ReaderState.getChapterIndex())) || 0) + 1),
     ];
     for (const fn of chain){
-      try { const r = fn(); if (r !== undefined) return r; } catch(e){ LOG('advance err', e); }
+      try { const r = fn(); if (r !== undefined) return r; } catch(e){}
     }
     try { window.dispatchEvent(new CustomEvent('inkwell:next-chapter')); } catch(e){}
   }
   function onClick(){
-    hide(); // hide immediately to avoid double taps
+    hide();
     withSwipeEnabled(advance);
-    setTimeout(bind, 120); // re-evaluate after navigation
+    setTimeout(bind, 120);
   }
 
-  /* ---------- lifecycle ---------- */
+  /* lifecycle */
   const rebind = ()=>bind();
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', rebind); else rebind();
   window.addEventListener('resize', rebind);
   window.addEventListener('orientationchange', rebind);
   document.addEventListener('reader:ready', rebind);
   document.addEventListener('chapter:changed', rebind);
-  new MutationObserver(()=>rebind()).observe(document.documentElement, { childList:true, subtree:true });
+  new MutationObserver(()=>rebind()).observe(d.documentElement, { childList:true, subtree:true });
 })();
 </script>
 
@@ -2424,14 +2442,18 @@ html.nextpill-active .edge-shield { display: none !important; pointer-events: no
     -webkit-tap-highlight-color: transparent;
     user-select: none;
   }
-  /* removed old inkwell-next-fab styles */
-  /* removed old inkwell-next-fab styles */
-  /* removed old inkwell-next-fab styles */
-  /* removed old inkwell-next-fab styles */
+  #inkwell-next-fab.show { display: inline-flex; }
+  #inkwell-next-fab .icon { font-size: 16px; }
+  #inkwell-next-fab .dismiss {
+    font-size: 16px;
+    opacity: .8;
+    padding: 0 2px;
+  }
+  #inkwell-next-fab:active { transform: translateY(1px); }
 </style>
 <!-- removed: vertical-mode edge-shield disable to re-enable tap zones --><style>
 /* Next CTA bar directly below toolbar */
-/* removed old next-cta-bar styles */
+/* removed next-cta-bar styles */
 /* Professional pill button */
 #next-toolbar-btn {
   appearance: none;
@@ -2447,7 +2469,7 @@ html.nextpill-active .edge-shield { display: none !important; pointer-events: no
 }
 #next-toolbar-btn:hover { background:#1e40af; }
 /* Only show CTA bar in vertical mode */
-body:not(.vertical-mode) /* removed old next-cta-bar styles */
+body:not(.vertical-mode) /* removed next-cta-bar styles */
 /* Disable side tap zones in vertical mode so they don't steal clicks */
 body/* tap-zones re-enabled: removed vertical-mode edge-shield override */
 </style></head></html>
