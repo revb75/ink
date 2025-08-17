@@ -2138,11 +2138,7 @@ document.addEventListener('error', function (e) {
 <!-- Floating Next Chapter Button (appears near end, vertical mode only) -->
 <!-- removed conflicting script -->
 <!-- removed conflicting script -->
-<style>
-/* Clean Next pill (top-right, safe-area aware) */
-/* removed old nextFab styles */
-#nextFab:active { transform: translateY(1px); }
-</style>
+<!-- removed old next button styles -->
 
 <!-- removed old next-pill script -->
 
@@ -2172,58 +2168,148 @@ document.addEventListener('error', function (e) {
 <!-- removed old next-button script -->
 
 
-<style>
-/* === ALWAYS-ON NEXT PILL (DEBUG) === */
-body #next-pill {
-  position: fixed;
-  top: calc(var(--toolbar-h, 48px) + env(safe-area-inset-top, 0px) + 10px);
-  right: calc(env(safe-area-inset-right, 0px) + 12px);
-  padding: 10px 16px;
-  border-radius: 999px;
-  border: 1px solid rgba(0,0,0,.15);
-  background: #111;
-  color: #fff;
-  font: 600 14px/1 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-  box-shadow: 0 6px 18px rgba(0,0,0,.25);
-  user-select: none;
-  -webkit-tap-highlight-color: transparent;
-  z-index: 2147483647;
-}
-/* Disable tap zones while we are forcing the pill (to avoid interception) */
-html.next-pill-active .edge-shield { display: none !important; pointer-events: none !important; }
-</style>
+
+
+<!-- removed old next-button script -->
+
+
+<!-- removed old next button script -->
+
 
 <script>
 (function(){
   'use strict';
-  const doc = document;
-  const log = (...a)=>console.debug('[NextPill-FORCE]', ...a);
+  const d = document;
+  const log = (...a)=>console.debug('[NextPill-SHADOW-NEAR]', ...a);
 
-  // Create pill once
-  function ensurePill(){
-    let p = doc.getElementById('next-pill');
-    if (!p){
-      p = doc.createElement('button');
-      p.id = 'next-pill';
-      p.type = 'button';
-      p.textContent = 'Next';
-      doc.body.appendChild(p);
+  /* ---------- host + shadow setup ---------- */
+  function ensureHost(){
+    let host = d.getElementById('inkwell-pill-host');
+    if (!host){
+      host = d.createElement('div');
+      host.id = 'inkwell-pill-host';
+      host.style.position = 'fixed';
+      host.style.top = 'calc(var(--toolbar-h, 48px) + env(safe-area-inset-top, 0px) + 10px)';
+      host.style.right = 'calc(env(safe-area-inset-right, 0px) + 12px)';
+      host.style.zIndex = '2147483647';
+      host.style.pointerEvents = 'auto';
+      host.style.display = 'none';   // hidden until near end
+      d.body.appendChild(host);
+    } else if (host !== d.body.lastElementChild){
+      d.body.appendChild(host);
     }
-    // Reinforce inline styles with !important (JS API)
-    const st = p.style;
-    st.setProperty('display', 'inline-flex', 'important');
-    st.setProperty('visibility', 'visible', 'important');
-    st.setProperty('opacity', '1', 'important');
-    st.setProperty('position', 'fixed', 'important');
-    st.setProperty('z-index', '2147483647', 'important');
-    st.setProperty('pointer-events', 'auto', 'important');
-    st.setProperty('top', 'calc(var(--toolbar-h, 48px) + env(safe-area-inset-top, 0px) + 10px)', 'important');
-    st.setProperty('right', 'calc(env(safe-area-inset-right, 0px) + 12px)', 'important');
-    return p;
+    return host;
+  }
+  function ensureShadow(host){
+    if (!host.shadowRoot){
+      const sr = host.attachShadow({ mode: 'open' });
+      const style = d.createElement('style');
+      style.textContent = `
+        :host{ all: initial; }
+        button {
+          all: unset;
+          box-sizing: border-box;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 10px 16px;
+          border-radius: 999px;
+          border: 1px solid rgba(0,0,0,.15);
+          background: #111;
+          color: #fff;
+          font: 600 14px/1 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+          box-shadow: 0 6px 18px rgba(0,0,0,.25);
+          cursor: pointer;
+          pointer-events: auto;
+          user-select: none;
+          -webkit-tap-highlight-color: transparent;
+        }
+        button:active { transform: translateY(1px); }
+      `;
+      const btn = d.createElement('button');
+      btn.id = 'pill';
+      btn.textContent = 'Next';
+      btn.addEventListener('click', onClick, { passive: true });
+      sr.append(style, btn);
+    }
+    return host.shadowRoot.getElementById('pill');
   }
 
-  // Direct chapter advance (no tap-zone)
-  function nextAdvance(){
+  /* ---------- reader helpers ---------- */
+  function isVertical(){
+    try { if (window.ReaderState && typeof window.ReaderState.getMode==='function') return window.ReaderState.getMode()==='vertical'; } catch(e){}
+    const p = new URLSearchParams(location.search).get('vert');
+    if (p==='true') return true; if (p==='false') return false;
+    return (localStorage.getItem('InkWell:isVertical')==='true') || d.body.classList.contains('vertical-mode');
+  }
+  function getScroller(){
+    if (!isVertical()) return d.scrollingElement || d.documentElement;
+    const r = d.getElementById('reader') || d.querySelector('[data-role="reader"], .reader, main');
+    return r || (d.scrollingElement || d.documentElement);
+  }
+  function ensureSentinel(el){
+    if (!el) return null;
+    let s = el.querySelector('#inkwell-end-sentinel');
+    if (!s){
+      s = d.createElement('div');
+      s.id = 'inkwell-end-sentinel';
+      s.style.width = '1px';
+      s.style.height = '1px';
+      s.style.opacity = '0';
+      s.style.pointerEvents = 'none';
+      el.appendChild(s);
+    } else if (s !== el.lastElementChild){
+      el.appendChild(s);
+    }
+    return s;
+  }
+
+  /* ---------- show/hide near end via IO ---------- */
+  let host, pill, scroller, io;
+  function show(){ if (host.style.display !== 'block') host.style.display = 'block'; }
+  function hide(){ if (host.style.display !== 'none') host.style.display = 'none'; }
+
+  function bind(){
+    host = ensureHost();
+    pill = ensureShadow(host);
+    const el = getScroller();
+    if (el !== scroller){
+      scroller = el;
+      if (io){ try{ io.disconnect(); }catch(e){} io = null; }
+      const sentinel = ensureSentinel(scroller);
+      if (sentinel){
+        io = new IntersectionObserver((entries)=>{
+          const e = entries && entries[0];
+          if (e && e.isIntersecting) show(); else hide();
+        }, {
+          root: (scroller === (d.scrollingElement || d.documentElement)) ? null : scroller,
+          rootMargin: '0px 0px -10% 0px',
+          threshold: 0
+        });
+        io.observe(sentinel);
+      }
+    }
+  }
+
+  /* ---------- click handler ---------- */
+  function enableTapZones(){
+    d.querySelectorAll('.edge-shield').forEach(el => {
+      el.style.removeProperty('display');
+      el.style.removeProperty('pointer-events');
+    });
+  }
+  function disableTapZones(){
+    d.querySelectorAll('.edge-shield').forEach(el => {
+      el.style.display = 'none';
+      el.style.pointerEvents = 'none';
+    });
+  }
+  function clickRightTap(){
+    const rightTap = d.querySelector('.edge-shield.right, #rightTapZone, [data-role="tap-right"]');
+    if (rightTap){ try { rightTap.click(); return true; } catch(_){} }
+    return false;
+  }
+  function nextFallback(){
     const chain = [
       () => window.nextChapter && window.nextChapter(),
       () => window.goToNextChapter && window.goToNextChapter(),
@@ -2232,51 +2318,30 @@ html.next-pill-active .edge-shield { display: none !important; pointer-events: n
       () => window.turnPage && window.turnPage(1),
       () => (typeof window.loadChapter==='function') && window.loadChapter(((window.currentChapterIndex ?? window.chapterIndex ?? (window.ReaderState && typeof ReaderState.getChapterIndex==='function' && ReaderState.getChapterIndex())) || 0) + 1),
     ];
-    for (const fn of chain){ try { const r = fn(); if (r !== undefined) return r; } catch(e){} }
-    try { window.dispatchEvent(new CustomEvent('inkwell:next-chapter')); } catch(e){}
+    for (const fn of chain){ try { const r = fn(); if (r !== undefined) return r; } catch(_){} }
+    try { window.dispatchEvent(new CustomEvent('inkwell:next-chapter')); } catch(_) {}
+  }
+  function onClick(){
+    // Temporarily restore tap zones to invoke the reader's own handler
+    enableTapZones();
+    const usedTap = clickRightTap();
+    // Re-disable tap zones for your UX once the navigation starts
+    setTimeout(disableTapZones, 50);
+    if (!usedTap) nextFallback();
+    hide(); // hide pill until next chapter settles
+    // Rebind after chapter change
+    setTimeout(bind, 150);
   }
 
-  function forceOn(){
-    doc.documentElement.classList.add('next-pill-active');
-    const p = ensurePill();
-    // Keep pill last in body so no overlays cover it
-    if (p !== doc.body.lastElementChild) doc.body.appendChild(p);
-  }
-
-  function watchdog(){
-    const p = ensurePill();
-    const cs = getComputedStyle(p);
-    if (cs.display === 'none' || cs.visibility === 'hidden' || cs.opacity === '0'){
-      log('restoring pill (overridden by external CSS)');
-      forceOn();
-    }
-  }
-
-  function attach(){
-    forceOn();
-    const p = ensurePill();
-    p.onclick = ()=>{
-      // Restore defaults and advance immediately
-      doc.documentElement.classList.remove('next-pill-active');
-      nextAdvance();
-      // Force back on after navigation change
-      setTimeout(forceOn, 100);
-    };
-  }
-
-  // Re-attach on changes (some readers rebuild DOM)
-  const reattach = ()=>attach();
-  document.addEventListener('DOMContentLoaded', reattach);
-  window.addEventListener('resize', reattach);
-  window.addEventListener('orientationchange', reattach);
-  document.addEventListener('reader:ready', reattach);
-  document.addEventListener('chapter:changed', reattach);
-  new MutationObserver(()=>reattach()).observe(document.documentElement, { childList:true, subtree:true });
-
-  // Start
-  attach();
-  // Watchdog to defeat nukers every 200ms
-  setInterval(watchdog, 200);
+  /* ---------- lifecycle ---------- */
+  const rebind = ()=>bind();
+  d.addEventListener('DOMContentLoaded', rebind);
+  window.addEventListener('resize', rebind);
+  window.addEventListener('orientationchange', rebind);
+  d.addEventListener('reader:ready', rebind);
+  d.addEventListener('chapter:changed', rebind);
+  new MutationObserver(()=>rebind()).observe(d.documentElement, { childList:true, subtree:true });
+  bind();
 })();
 </script>
 
