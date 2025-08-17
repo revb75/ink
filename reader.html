@@ -2368,365 +2368,126 @@ document.addEventListener('error', function (e) {
 </script>
 
 
-<!-- SAFE-INJECT: Minimal Next pill (no removals, no guards) -->
-<script>
-(() => {
-  const d = document;
-  function ready(fn){ if (d.readyState !== 'loading') fn(); else d.addEventListener('DOMContentLoaded', fn, {once:true}); }
-  ready(() => {
-    try {
-      // Host (fixed, top-right)
-      const host = d.createElement('div');
-      host.id = 'np-host';
-      host.style.position = 'fixed';
-      host.style.top = 'calc(var(--toolbar-h, 48px) + env(safe-area-inset-top,0px) + 12px)';
-      host.style.right = 'calc(env(safe-area-inset-right,0px) + 12px)';
-      host.style.zIndex = '2147483647';
-      host.style.pointerEvents = 'auto';
-      host.style.display = 'none'; // hidden until near end
-      d.body.appendChild(host);
 
-      // Shadow DOM for isolation
-      const sr = host.attachShadow({mode:'open'});
-      const style = d.createElement('style');
-      style.textContent = `
-        :host{ all: initial; }
-        button {
-          all: unset;
-          display: inline-flex; align-items: center; justify-content: center;
-          padding: 10px 16px; border-radius: 999px;
-          border: 1px solid rgba(0,0,0,.15);
-          background: #111; color: #fff;
-          font: 600 14px/1 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-          box-shadow: 0 6px 18px rgba(0,0,0,.25);
-          cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;
-        }
-        button:active { transform: translateY(1px); }
-      `;
-      const btn = d.createElement('button');
-      btn.id = 'pill';
-      btn.textContent = 'Next';
+
+
+<!-- SAFE-INJECT v4: strict-compatible, tap-anywhere synth, no '||' chains -->
+<script>
+(function(){
+  var d=document;
+  function onReady(fn){ if(d.readyState!=='loading') fn(); else d.addEventListener('DOMContentLoaded', fn, {once:true}); }
+  onReady(function(){
+    try{
+      // Host (fixed, top-right) + Shadow button
+      var host=d.createElement('div');
+      host.id='np-host'; host.style.position='fixed';
+      host.style.top='calc(var(--toolbar-h,48px) + env(safe-area-inset-top,0px) + 12px)';
+      host.style.right='calc(env(safe-area-inset-right,0px) + 12px)';
+      host.style.zIndex='2147483647'; host.style.pointerEvents='auto'; host.style.display='none';
+      d.body.appendChild(host);
+      var sr=host.attachShadow({mode:'open'});
+      var style=d.createElement('style');
+      style.textContent=':host{all:initial}button{all:unset;display:inline-flex;align-items:center;justify-content:center;padding:10px 16px;border-radius:999px;border:1px solid rgba(0,0,0,.15);background:#111;color:#fff;font:600 14px/1 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;box-shadow:0 6px 18px rgba(0,0,0,.25);cursor:pointer;-webkit-tap-highlight-color:transparent}button:active{transform:translateY(1px)}';
+      var btn=d.createElement('button'); btn.id='pill'; btn.textContent='Next';
       sr.append(style, btn);
 
-      // Advance chain (no tap-zone deps, no globals changed)
-      function advance(){
-        const chain = [
-          () => window.nextChapter && window.nextChapter(),
-          () => window.goToNextChapter && window.goToNextChapter(),
-          () => window.goNext && window.goNext(),
-          () => window.next && window.next(),
-          () => window.turnPage && window.turnPage(1),
-          () => (typeof window.loadChapter==='function') && window.loadChapter(((window.currentChapterIndex ?? window.chapterIndex ?? (window.ReaderState && typeof ReaderState.getChapterIndex==='function' && ReaderState.getChapterIndex())) || 0) + 1),
-          () => (window.dispatchEvent(new CustomEvent('inkwell:next-chapter')), true),
-        ];
-        for (const fn of chain){ try { const r = fn(); if (r !== undefined) return r; } catch(_){} }
+      // Find scroller
+      function getScroller(){
+        var el=d.getElementById('reader');
+        if(!el) el=d.querySelector('[data-role="reader"]');
+        if(!el) el=d.querySelector('.reader');
+        if(!el) el=d.querySelector('main');
+        if(!el) el=d.scrollingElement||d.documentElement;
+        return el;
       }
-      btn.addEventListener('click', advance, {passive:true});
+      var scroller=getScroller();
 
-      // Near-end detection (simple scroll fraction fallback)
-      const scroller = d.getElementById('reader') || d.querySelector('[data-role="reader"], .reader, main') || d.scrollingElement || d.documentElement;
-      function onScroll(){
-        const max = Math.max(1, scroller.scrollHeight - scroller.clientHeight);
-        const frac = max ? scroller.scrollTop / max : 0;
-        host.style.display = frac >= 0.90 ? 'block' : 'none'; // show in last 10%
-      }
-      scroller.addEventListener('scroll', onScroll, {passive:true});
-      window.addEventListener('resize', onScroll);
-      onScroll();
-    } catch (e) {
-      console.error('[SAFE-INJECT Next pill] failed:', e);
-    }
-  });
-})();
-</script>
-
-
-<!-- SAFE-INJECT v2: Robust Next pill with multi-fallback click -->
-<script>
-(() => {
-  const d = document;
-  function ready(fn){ if (d.readyState !== 'loading') fn(); else d.addEventListener('DOMContentLoaded', fn, {once:true}); }
-  ready(() => {
-    try {
-      // Host (fixed, top-right)
-      const host = d.createElement('div');
-      host.id = 'np-host';
-      Object.assign(host.style, {
-        position: 'fixed',
-        top: 'calc(var(--toolbar-h, 48px) + env(safe-area-inset-top,0px) + 12px)',
-        right: 'calc(env(safe-area-inset-right,0px) + 12px)',
-        zIndex: '2147483647',
-        pointerEvents: 'auto',
-        display: 'none' // hidden until near end
-      });
-      d.body.appendChild(host);
-
-      // Shadow DOM
-      const sr = host.attachShadow({mode:'open'});
-      const style = d.createElement('style');
-      style.textContent = `
-        :host{ all: initial; }
-        button {
-          all: unset;
-          display: inline-flex; align-items: center; justify-content: center;
-          padding: 10px 16px; border-radius: 999px;
-          border: 1px solid rgba(0,0,0,.15);
-          background: #111; color: #fff;
-          font: 600 14px/1 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-          box-shadow: 0 6px 18px rgba(0,0,0,.25);
-          cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;
-        }
-        button:active { transform: translateY(1px); }
-      `;
-      const btn = d.createElement('button');
-      btn.id = 'pill';
-      btn.textContent = 'Next';
-      sr.append(style, btn);
-
-      // Helpers
-      const scroller = d.getElementById('reader') || d.querySelector('[data-role="reader"], .reader, main') || d.scrollingElement || d.documentElement;
-      function show(){ host.style.display = 'block'; }
-      function hide(){ host.style.display = 'none'; }
-
-      // Robust "tap-right" synthesizer
-      function synthClick(el){
-        if (!el) return false;
-        const r = el.getBoundingClientRect();
-        const x = Math.min(r.right - 4, r.left + Math.max(4, r.width * 0.9));
-        const y = r.top + Math.min(r.height - 4, Math.max(4, r.height * 0.5));
-        const opts = {bubbles:true, cancelable:true, clientX:x, clientY:y, view:window};
-        try {
-          el.dispatchEvent(new PointerEvent('pointerdown', opts));
-          el.dispatchEvent(new MouseEvent('mousedown', opts));
-          el.dispatchEvent(new PointerEvent('pointerup', opts));
-          el.dispatchEvent(new MouseEvent('mouseup', opts));
-          el.dispatchEvent(new MouseEvent('click', opts));
-          return true;
-        } catch(_) {
-          try { el.click(); return true; } catch(e){}
-        }
-        return false;
-      }
-
-      function keyNav(){
-        const ev = new KeyboardEvent('keydown', {key:'ArrowRight', code:'ArrowRight', keyCode:39, which:39, bubbles:true});
-        return window.dispatchEvent(ev);
-      }
-
-      function advance(){
-        const chain = [
-          () => { const t=d.querySelector('.edge-shield.right, #rightTapZone, [data-role="tap-right"]'); if (t) return synthClick(t); },
-          () => window.nextChapter && window.nextChapter(),
-          () => window.goToNextChapter && window.goToNextChapter(),
-          () => window.goNext && window.goNext(),
-          () => window.next && window.next(),
-          () => window.turnPage && window.turnPage(1),
-          () => (typeof window.loadChapter==='function') && window.loadChapter(((window.currentChapterIndex ?? window.chapterIndex ?? (window.ReaderState && typeof ReaderState.getChapterIndex==='function' && ReaderState.getChapterIndex())) || 0) + 1),
-          () => keyNav(),
-          () => { scroller.scrollTop = scroller.scrollHeight; return true; }, // force bottom
-          () => (window.dispatchEvent(new CustomEvent('inkwell:next-chapter')), true),
-        ];
-        for (const fn of chain){
-          try { const r = fn(); if (r !== undefined) return r; } catch(_) {}
-        }
-      }
-
-      btn.addEventListener('click', () => {
-        hide();
-        advance();
-        setTimeout(onScroll, 120); // re-eval
-      }, {passive:true});
-
-      // Near-end detection: IO sentinel + scroll fallback
-      let io = null;
+      // Show near last 10% (IO + fallback)
+      var io=null;
       function ensureSentinel(){
-        let s = scroller.querySelector('#np-sentinel');
-        if (!s){
-          s = d.createElement('div');
-          s.id = 'np-sentinel';
-          s.style.width = '1px';
-          s.style.height = '1px';
-          s.style.opacity = '0';
-          s.style.pointerEvents = 'none';
-          scroller.appendChild(s);
-        } else if (s !== scroller.lastElementChild){
-          scroller.appendChild(s);
-        }
+        var s=scroller.querySelector('#np-sentinel');
+        if(!s){ s=d.createElement('div'); s.id='np-sentinel'; s.style.width='1px'; s.style.height='1px'; s.style.opacity='0'; s.style.pointerEvents='none'; scroller.appendChild(s); }
+        else if (s!==scroller.lastElementChild){ scroller.appendChild(s); }
         return s;
       }
-
       function bindIO(){
-        try {
-          const s = ensureSentinel();
-          if (io) io.disconnect();
-          io = new IntersectionObserver((entries)=>{
-            const e = entries && entries[0];
-            if (e && e.isIntersecting) show(); else hide();
-          }, {
-            root: (scroller === (d.scrollingElement || d.documentElement)) ? null : scroller,
-            rootMargin: '0px 0px -10% 0px',
-            threshold: 0
-          });
+        try{
+          var s=ensureSentinel();
+          if(io) io.disconnect();
+          io=new IntersectionObserver(function(entries){
+            var e=entries&&entries[0];
+            if(e&&e.isIntersecting) host.style.display='block'; else host.style.display='none';
+          }, { root:(scroller===(d.scrollingElement||d.documentElement))?null:scroller, rootMargin:'0px 0px -10% 0px', threshold:0 });
           io.observe(s);
-        } catch(e){ /* IO not available; fallback to scroll fraction only */ }
+        }catch(e){ /* older browsers: scroll fallback only */ }
       }
-
       function onScroll(){
-        const max = Math.max(1, scroller.scrollHeight - scroller.clientHeight);
-        const frac = max ? scroller.scrollTop / max : 0;
-        if (frac >= 0.90) show(); else hide();
+        var max=scroller.scrollHeight - scroller.clientHeight;
+        if(max<1){ host.style.display='none'; return; }
+        var frac=scroller.scrollTop / max;
+        host.style.display = (frac>=0.90)?'block':'none';
       }
-
       scroller.addEventListener('scroll', onScroll, {passive:true});
       window.addEventListener('resize', onScroll);
-      bindIO();
-      onScroll();
-    } catch (e) {
-      console.error('[SAFE-INJECT v2] failed:', e);
-    }
-  });
-})();
-</script>
+      bindIO(); onScroll();
 
-
-<!-- SAFE-INJECT v3: Force-next (no return-value dependence, timed sequence) -->
-<script>
-(() => {
-  const d = document;
-  function ready(fn){ if (d.readyState !== 'loading') fn(); else d.addEventListener('DOMContentLoaded', fn, {once:true}); }
-  ready(() => {
-    try {
-      const host = d.createElement('div');
-      host.id = 'np-host';
-      Object.assign(host.style, {
-        position: 'fixed',
-        top: 'calc(var(--toolbar-h, 48px) + env(safe-area-inset-top,0px) + 12px)',
-        right: 'calc(env(safe-area-inset-right,0px) + 12px)',
-        zIndex: '2147483647',
-        pointerEvents: 'auto',
-        display: 'none'
-      });
-      d.body.appendChild(host);
-
-      const sr = host.attachShadow({mode:'open'});
-      const style = d.createElement('style');
-      style.textContent = `
-        :host{ all: initial; }
-        button {
-          all: unset;
-          display: inline-flex; align-items: center; justify-content: center;
-          padding: 10px 16px; border-radius: 999px;
-          border: 1px solid rgba(0,0,0,.15);
-          background: #111; color: #fff;
-          font: 600 14px/1 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-          box-shadow: 0 6px 18px rgba(0,0,0,.25);
-          cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;
+      // Click: synthesize right-edge click on document + scroller, then keyboard + bottom scroll
+      function bypassSwipe(){
+        try{ Object.defineProperty(window,'SWIPE_DISABLED',{configurable:true,get:function(){return false;},set:function(){}}); }catch(e){ window.SWIPE_DISABLED=false; }
+      }
+      function fireMouse(target, type, x, y){
+        try{ target.dispatchEvent(new MouseEvent(type,{bubbles:true,cancelable:true,clientX:x,clientY:y,view:window})); }catch(_){}
+      }
+      function firePointer(target, type, x, y){
+        try{ target.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,clientX:x,clientY:y,view:window})); }catch(_){}
+      }
+      function fireTouch(target, x, y){
+        try{
+          var t=new Touch({identifier:Date.now(), target:target, clientX:x, clientY:y});
+          var te=new TouchEvent('touchend',{bubbles:true,cancelable:true,changedTouches:[t]});
+          target.dispatchEvent(te);
+        }catch(_){}
+      }
+      function synthTapAt(x, y){
+        var tList=[d.elementFromPoint(x,y), scroller, d.body, d.documentElement];
+        for(var i=0;i<tList.length;i++){
+          var t=tList[i]; if(!t) continue;
+          firePointer(t,'pointerdown',x,y); fireMouse(t,'mousedown',x,y);
+          firePointer(t,'pointerup',x,y);   fireMouse(t,'mouseup',x,y); fireMouse(t,'click',x,y);
+          fireTouch(t,x,y);
         }
-        button:active { transform: translateY(1px); }
-      `;
-      const btn = d.createElement('button');
-      btn.id = 'pill';
-      btn.textContent = 'Next';
-      sr.append(style, btn);
-
-      const scroller = d.getElementById('reader') || d.querySelector('[data-role="reader"], .reader, main') || d.scrollingElement || d.documentElement;
-      function show(){ host.style.display = 'block'; }
-      function hide(){ host.style.display = 'none'; }
-
-      function synthClick(el){
-        if (!el) return;
-        const r = el.getBoundingClientRect();
-        const x = Math.min(r.right - 4, r.left + Math.max(4, r.width * 0.9));
-        const y = r.top + Math.min(r.height - 4, Math.max(4, r.height * 0.5));
-        const opts = {bubbles:true, cancelable:true, clientX:x, clientY:y, view:window};
-        try {
-          el.dispatchEvent(new PointerEvent('pointerdown', opts));
-          el.dispatchEvent(new MouseEvent('mousedown', opts));
-          el.dispatchEvent(new PointerEvent('pointerup', opts));
-          el.dispatchEvent(new MouseEvent('mouseup', opts));
-          el.dispatchEvent(new MouseEvent('click', opts));
-        } catch(_) { try { el.click(); } catch(e){} }
       }
-      function keyRight(){
-        try {
-          window.dispatchEvent(new KeyboardEvent('keydown', {key:'ArrowRight', code:'ArrowRight', keyCode:39, which:39, bubbles:true}));
-        } catch(e){}
-      }
-      function bypassSwipe(block=true){
-        try { Object.defineProperty(window, 'SWIPE_DISABLED', { configurable:true, get(){ return block?false:false; }, set(){} }); }
-        catch(_){ window.SWIPE_DISABLED = false; }
-      }
+      function keyRight(){ try{ window.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',code:'ArrowRight',keyCode:39,which:39,bubbles:true})); }catch(_){ } }
+      function forceBottom(){ try{ scroller.scrollTop=scroller.scrollHeight; }catch(_){ } }
+      function signalCustom(){ try{ window.dispatchEvent(new CustomEvent('inkwell:next-chapter')); }catch(_){ } }
 
-      function forceNextSequence(){
-        // 0) ensure guards won't block
-        bypassSwipe(true);
-        // 1) try right tap zone
-        const tap = d.querySelector('.edge-shield.right, #rightTapZone, [data-role="tap-right"]');
-        synthClick(tap);
-        // 2) call all known functions (do not rely on return)
-        try { window.nextChapter && window.nextChapter(); } catch(_){}
-        try { window.goToNextChapter && window.goToNextChapter(); } catch(_){}
-        try { window.goNext && window.goNext(); } catch(_){}
-        try { window.next && window.next(); } catch(_){}
-        try { window.turnPage && window.turnPage(1); } catch(_){}
-        try { if (typeof window.loadChapter==='function'){ 
-            const idx = (window.currentChapterIndex ?? window.chapterIndex ?? (window.ReaderState && typeof ReaderState.getChapterIndex==='function' && ReaderState.getChapterIndex()) || 0) + 1;
-            window.loadChapter(idx);
-        }} catch(_){}
-        // 3) send keyboard fallback
+      btn.addEventListener('click', function(){
+        host.style.display='none';
+        bypassSwipe();
+        var vw = (window.innerWidth||d.documentElement.clientWidth||1024);
+        var vh = (window.innerHeight||d.documentElement.clientHeight||768);
+        var x  = Math.max(1, vw - 8);
+        var y  = Math.max(1, Math.floor(vh * 0.5));
+        // 1) synthesize a right-edge tap broadly
+        synthTapAt(x, y);
+        // 2) try a right-edge overlay if present
+        var tap = d.querySelector('.edge-shield.right, #rightTapZone, [data-role="tap-right"]');
+        if (tap){
+          var r = tap.getBoundingClientRect();
+          var tx = Math.min(r.right-4, r.left + Math.max(4, Math.floor(r.width*0.9)));
+          var ty = r.top + Math.min(r.height-4, Math.max(4, Math.floor(r.height*0.5)));
+          synthTapAt(tx, ty);
+        }
+        // 3) keyboard & bottom scroll
         keyRight();
-        // 4) scroll to bottom in case an auto-watcher is present
-        try { scroller.scrollTop = scroller.scrollHeight; } catch(_){}
-        // 5) final signal
-        try { window.dispatchEvent(new CustomEvent('inkwell:next-chapter')); } catch(_){}
-        // 6) restore guard
-        setTimeout(()=>bypassSwipe(false), 200);
-      }
-
-      btn.addEventListener('click', () => {
-        hide();
-        forceNextSequence();
+        forceBottom();
+        // 4) final custom event
+        signalCustom();
+        // Re-evaluate after layout
         setTimeout(onScroll, 160);
       }, {passive:true});
-
-      // near end detection
-      let io=null;
-      function ensureSentinel(){
-        let s = scroller.querySelector('#np-sentinel');
-        if (!s){
-          s = d.createElement('div');
-          s.id = 'np-sentinel';
-          Object.assign(s.style, {width:'1px', height:'1px', opacity:'0', pointerEvents:'none'});
-          scroller.appendChild(s);
-        } else if (s !== scroller.lastElementChild){ scroller.appendChild(s); }
-        return s;
-      }
-      function bindIO(){
-        try {
-          const s = ensureSentinel();
-          if (io) io.disconnect();
-          io = new IntersectionObserver((entries)=>{
-            const e = entries && entries[0];
-            if (e && e.isIntersecting) show(); else hide();
-          }, {
-            root: (scroller === (d.scrollingElement || d.documentElement)) ? null : scroller,
-            rootMargin: '0px 0px -10% 0px',
-            threshold: 0
-          });
-          io.observe(s);
-        } catch(e){ /* fallback only */ }
-      }
-      function onScroll(){
-        const max = Math.max(1, scroller.scrollHeight - scroller.clientHeight);
-        const frac = max ? scroller.scrollTop / max : 0;
-        host.style.display = frac >= 0.90 ? 'block' : 'none';
-      }
-      scroller.addEventListener('scroll', onScroll, {passive:true});
-      window.addEventListener('resize', onScroll);
-      bindIO();
-      onScroll();
-    } catch (e) {
-      console.error('[SAFE-INJECT v3] failed:', e);
+    }catch(e){
+      console.error('[SAFE-INJECT v4] failed:', e);
     }
   });
 })();
