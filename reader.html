@@ -2262,8 +2262,12 @@ document.addEventListener('error', function (e) {
 <!-- removed old next-pill script -->
 
 
+
+
+
+
 <style>
-/* --- NEXT PILL (clean) --- */
+/* --- NEXT PILL (force-visible via html.next-pill-active) --- */
 #next-pill {
   position: fixed;
   top: calc(var(--toolbar-h, 48px) + env(safe-area-inset-top, 0px) + 10px);
@@ -2277,14 +2281,18 @@ document.addEventListener('error', function (e) {
   box-shadow: 0 6px 18px rgba(0,0,0,.25);
   user-select: none;
   -webkit-tap-highlight-color: transparent;
-  display: none;
+  display: none !important;          /* hidden by default */
   z-index: 10010;
 }
 #next-pill:active { transform: translateY(1px); }
 
-/* When pill is visible, disable tap zones (edge shields). */
+/* Show pill only when html has the toggle class */
+html.next-pill-active #next-pill { display: inline-flex !important; }
+
+/* While pill is active, disable tap zones */
 html.next-pill-active .edge-shield { display: none !important; pointer-events: none !important; }
 </style>
+
 <script>
 (function(){
   'use strict';
@@ -2307,7 +2315,7 @@ html.next-pill-active .edge-shield { display: none !important; pointer-events: n
     return r || (doc.scrollingElement || doc.documentElement);
   }
 
-  // Create pill once
+  // Create pill once (no aria-label, to avoid broad nukers)
   let pill = doc.getElementById('next-pill');
   if (!pill){
     pill = doc.createElement('button');
@@ -2317,20 +2325,19 @@ html.next-pill-active .edge-shield { display: none !important; pointer-events: n
     doc.body.appendChild(pill);
   }
 
-  // Show only near end (last 10% of scrollable height)
+  // Show only in last 10% of scroller
   const THRESHOLD = 0.10;
   let scroller = null;
 
   function remainingFraction(el){
     const total = Math.max(1, el.scrollHeight);
     const seen = el.scrollTop + el.clientHeight;
-    const remaining = Math.max(0, total - seen);
     if (total <= el.clientHeight + 2) return 1; // not scrollable -> don't show
-    return remaining / total;
+    return Math.max(0, (total - seen) / total);
   }
 
-  function show(){ if (pill.style.display !== 'inline-flex'){ pill.style.display = 'inline-flex'; doc.documentElement.classList.add('next-pill-active'); } }
-  function hide(){ if (pill.style.display !== 'none'){ pill.style.display = 'none'; doc.documentElement.classList.remove('next-pill-active'); } }
+  function show(){ doc.documentElement.classList.add('next-pill-active'); }
+  function hide(){ doc.documentElement.classList.remove('next-pill-active'); }
 
   function onScroll(){
     const el = scroller || getScroller();
@@ -2347,11 +2354,6 @@ html.next-pill-active .edge-shield { display: none !important; pointer-events: n
     onScroll();
   }
 
-  // MutationObserver: rebind when #reader appears/changes
-  const mo = new MutationObserver(()=>bind());
-  mo.observe(doc.documentElement, { childList: true, subtree: true });
-
-  // Click behavior: temporarily re-enable tap zones, click right zone if available, else fallbacks, then restore default
   function clickRightTapZone(){
     const rightTap = doc.querySelector('.edge-shield.right, #rightTapZone, [data-role="tap-right"]');
     if (rightTap){ try { rightTap.click(); return true; } catch(_){} }
@@ -2372,15 +2374,18 @@ html.next-pill-active .edge-shield { display: none !important; pointer-events: n
   }
 
   pill.addEventListener('click', () => {
-    // Restore default tap zones before triggering the next action
-    doc.documentElement.classList.remove('next-pill-active');
+    // Restore defaults before advancing
     hide();
+    // Re-enable tap zones by removing the class first, then trigger page forward
     if (!clickRightTapZone()) nextFallback();
-    // After a beat, allow the UI to settle back
-    setTimeout(() => { onScroll(); }, 50);
+    // Re-bind after layout settles
+    setTimeout(() => { bind(); }, 80);
   });
 
-  // Lifecycle
+  // Rebind on DOM mutations (reader loads async sometimes)
+  const mo = new MutationObserver(()=>bind());
+  mo.observe(doc.documentElement, { childList: true, subtree: true });
+
   doc.addEventListener('DOMContentLoaded', bind);
   window.addEventListener('resize', bind);
   window.addEventListener('orientationchange', bind);
