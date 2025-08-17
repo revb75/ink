@@ -439,123 +439,8 @@ body.theme-dark #reader ::selection {
 
 
 /* Floating '' button: safe-area aware, never overlaps toolbar */
-#next-chapter-btn {
-  position: fixed;
-  right: 12px;
-  bottom: calc(var(--toolbar-h) + env(safe-area-inset-bottom, 0px) + 12px);
-  z-index: 2500;
-  padding: 12px 16px;
-  border-radius: 9999px;
-  border: none;
-  background: #1e73ff;
-  color: #fff;
-  font-weight: 600;
-  box-shadow: 0 6px 18px rgba(0,0,0,.2);
-  opacity: 0;
-  transform: translateY(8px);
-  pointer-events: none;
-  transition: opacity .22s ease, transform .22s ease;
-}
-#next-chapter-btn.show {
-  opacity: 1;
-  transform: translateY(0);
-  pointer-events: auto;
-}
-#next-chapter-btn:active { transform: translateY(1px); }
-
-
 /* (disabled) Force bottom-right; neutralize any inherited 'top' */
-#next-chapter-btn {
-  top: auto !important;
-  bottom: calc(var(--toolbar-h) + env(safe-area-inset-bottom, 0px) + 12px) !important;
-  right: 12px !important;
-  left: auto !important;
-}
-/* Nuke any legacy top-right Next buttons that might linger */
-button[aria-label*="" i]:not(#next-chapter-btn),
-a[aria-label*="" i],
-button[class*="next"][class*="chapter"]:not(#next-chapter-btn),
-a[class*="next"][class*="chapter"] {
-  display: none !important;
-  pointer-events: none !important;
-}
 
-
-@media (hover:hover) {
-  #next-chapter-btn:hover { filter: brightness(1.05); }
-}
-
-
-/* Professional, minimal pill button — safe-area aware, above toolbar */
-#next-chapter-btn {
-  position: fixed;
-  inset: auto 14px calc(var(--toolbar-h) + env(safe-area-inset-bottom, 0px) + 14px) auto;
-  z-index: 2500;
-  padding: 12px 16px;
-  border-radius: 9999px;
-  border: 1px solid rgba(255,255,255,0.14);
-  background: rgba(20,20,20,0.72);
-  color: #fff;
-  font-weight: 700;
-  font-size: 15px;
-  line-height: 1;
-  letter-spacing: .2px;
-  box-shadow: 0 10px 24px rgba(0,0,0,.28);
-  -webkit-tap-highlight-color: transparent;
-  backdrop-filter: saturate(120%) blur(4px);
-  opacity: 0;
-  transform: translateY(8px);
-  pointer-events: none;
-  transition: opacity .18s ease, transform .18s ease;
-}
-#next-chapter-btn.show {
-  opacity: 1;
-  transform: translateY(0);
-  pointer-events: auto;
-}
-#next-chapter-btn:active { transform: translateY(1px); }
-@media (hover:hover) {
-  #next-chapter-btn:hover { filter: brightness(1.06); }
-}
-#next-chapter-btn:focus-visible {
-  outline: 2px solid rgba(255,255,255,0.6);
-  outline-offset: 2px;
-  box-shadow: 0 0 0 4px rgba(255,255,255,0.25), 0 10px 24px rgba(0,0,0,.28);
-}
-
-</style>
-<style id="inkwell-css-override">
-  .chapter, .page {
-    margin: 0 !important;
-    padding: 1rem !important;
-    box-sizing: border-box !important;
-    max-width: 100% !important;
-    width: 100% !important;
-  }
-
-  .chapter * {
-    margin-left: 0 !important;
-    padding-left: 0 !important;
-    box-sizing: border-box !important;
-  }
-
-  body, html {
-    overflow-x: hidden !important;
-  }
-</style>
-<style id="reader-height-override">
-  /* Layered fallbacks for older browsers */
-  #reader {
-    min-height: calc(100vh - var(--toolbar-h)) !important;   /* oldest */
-    min-height: calc(100svh - var(--toolbar-h)) !important;  /* small viewport */
-    min-height: calc(100dvh - var(--toolbar-h)) !important;  /* dynamic viewport (best) */
-  }
-</style>
-<style>
-@keyframes floatUpFade {
-  0% { transform: translateY(0); opacity: 1; }
-  100% { transform: translateY(-100px); opacity: 0; }
-}
 .floating-emoji {
   position: absolute;
   font-size: 2rem;
@@ -2293,16 +2178,16 @@ html.next-pill-active #next-pill { display: inline-flex !important; }
 html.next-pill-active .edge-shield { display: none !important; pointer-events: none !important; }
 </style>
 
+
+
+
 <script>
 (function(){
   'use strict';
   const doc = document;
 
   function isVertical(){
-    try {
-      if (window.ReaderState && typeof window.ReaderState.getMode === 'function')
-        return window.ReaderState.getMode() === 'vertical';
-    } catch(e){}
+    try { if (window.ReaderState && typeof window.ReaderState.getMode === 'function') return window.ReaderState.getMode() === 'vertical'; } catch(e){}
     const p = new URLSearchParams(location.search).get('vert');
     if (p === 'true') return true;
     if (p === 'false') return false;
@@ -2315,7 +2200,7 @@ html.next-pill-active .edge-shield { display: none !important; pointer-events: n
     return r || (doc.scrollingElement || doc.documentElement);
   }
 
-  // Create pill once (no aria-label, to avoid broad nukers)
+  // Create pill once
   let pill = doc.getElementById('next-pill');
   if (!pill){
     pill = doc.createElement('button');
@@ -2325,14 +2210,15 @@ html.next-pill-active .edge-shield { display: none !important; pointer-events: n
     doc.body.appendChild(pill);
   }
 
-  // Show only in last 10% of scroller
+  // Threshold (last 10%)
   const THRESHOLD = 0.10;
   let scroller = null;
 
   function remainingFraction(el){
+    if (!el) return 1;
     const total = Math.max(1, el.scrollHeight);
     const seen = el.scrollTop + el.clientHeight;
-    if (total <= el.clientHeight + 2) return 1; // not scrollable -> don't show
+    if (total <= el.clientHeight + 2) return 1; // not scrollable
     return Math.max(0, (total - seen) / total);
   }
 
@@ -2347,19 +2233,33 @@ html.next-pill-active .edge-shield { display: none !important; pointer-events: n
 
   function bind(){
     const el = getScroller();
-    if (scroller === el) return;
-    if (scroller) scroller.removeEventListener('scroll', onScroll, { passive:true });
-    scroller = el;
-    if (scroller) scroller.addEventListener('scroll', onScroll, { passive:true });
+    if (scroller !== el){
+      if (scroller) scroller.removeEventListener('scroll', onScroll, { passive:true });
+      scroller = el;
+      if (scroller) scroller.addEventListener('scroll', onScroll, { passive:true });
+    }
     onScroll();
   }
 
+  // Observe size/content changes to re-evaluate threshold
+  let ro;
+  function observeSize(){
+    try {
+      const el = getScroller();
+      if (ro) ro.disconnect();
+      if (window.ResizeObserver && el){
+        ro = new ResizeObserver(onScroll);
+        ro.observe(el);
+      }
+    } catch {}
+  }
+
+  // Click = revert nukes and advance
   function clickRightTapZone(){
-    const rightTap = doc.querySelector('.edge-shield.right, #rightTapZone, [data-role="tap-right"]');
+    const rightTap = doc.querySelector('.edge-shield.right, #rightTapZone, [data-role=\"tap-right\"]');
     if (rightTap){ try { rightTap.click(); return true; } catch(_){} }
     return false;
   }
-
   function nextFallback(){
     const chain = [
       () => window.nextChapter && window.nextChapter(),
@@ -2372,24 +2272,23 @@ html.next-pill-active .edge-shield { display: none !important; pointer-events: n
     for (const fn of chain){ try { const r = fn(); if (r !== undefined) return r; } catch(_){} }
     try { window.dispatchEvent(new CustomEvent('inkwell:next-chapter')); } catch(_) {}
   }
-
   pill.addEventListener('click', () => {
-    // Restore defaults before advancing
-    hide();
-    // Re-enable tap zones by removing the class first, then trigger page forward
+    hide(); // restore defaults immediately
     if (!clickRightTapZone()) nextFallback();
-    // Re-bind after layout settles
     setTimeout(() => { bind(); }, 80);
   });
 
-  // Rebind on DOM mutations (reader loads async sometimes)
-  const mo = new MutationObserver(()=>bind());
-  mo.observe(doc.documentElement, { childList: true, subtree: true });
+  // Rebind on key lifecycle events
+  doc.addEventListener('DOMContentLoaded', () => { bind(); observeSize(); });
+  window.addEventListener('resize', () => { bind(); observeSize(); });
+  window.addEventListener('orientationchange', () => { bind(); observeSize(); });
+  document.addEventListener('reader:ready', () => { bind(); observeSize(); });
+  document.addEventListener('chapter:changed', () => { bind(); observeSize(); });
+  // Some readers change overflow dynamically; watch for that
+  new MutationObserver(() => { bind(); observeSize(); }).observe(doc.documentElement, { childList:true, subtree:true, attributes:true, attributeFilter:['class','style'] });
 
-  doc.addEventListener('DOMContentLoaded', bind);
-  window.addEventListener('resize', bind);
-  window.addEventListener('orientationchange', bind);
-  bind();
+  // Kick
+  bind(); observeSize();
 })();
 </script>
 
