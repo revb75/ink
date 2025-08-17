@@ -2162,11 +2162,14 @@ document.addEventListener('error', function (e) {
 
 
 
+
+
+
+
+
 <style>
-/* === Next Pill (robust, sticky, nuke-resistant) === */
-html.next-pill-active body #next-pill {
-  display: inline-flex !important;
-}
+/* === NEXT PILL — HARDLOCK (won't be nuked) === */
+html.next-pill-active body #next-pill { display: inline-flex !important; }
 body #next-pill {
   position: fixed;
   top: calc(var(--toolbar-h, 48px) + env(safe-area-inset-top, 0px) + 10px);
@@ -2181,14 +2184,11 @@ body #next-pill {
   user-select: none;
   -webkit-tap-highlight-color: transparent;
   display: none !important;
-  z-index: 10050;
+  z-index: 2147483647; /* top-most */
 }
 body #next-pill:active { transform: translateY(1px); }
-
-/* Disable edge shields only while pill visible */
 html.next-pill-active .edge-shield { display: none !important; pointer-events: none !important; }
-
-/* Sentinel for IO detection */
+/* IO sentinel */
 #inkwell-end-sentinel{width:1px;height:1px;opacity:0;pointer-events:none;}
 </style>
 
@@ -2196,28 +2196,38 @@ html.next-pill-active .edge-shield { display: none !important; pointer-events: n
 (function(){
   'use strict';
   const doc = document;
+  const log = (...a)=>console.debug('[NextPill]', ...a);
 
-  // Utilities
+  /* ---------- helpers ---------- */
   function isVertical(){
     try { if (window.ReaderState && typeof window.ReaderState.getMode==='function') return window.ReaderState.getMode()==='vertical'; } catch(e){}
     const p = new URLSearchParams(location.search).get('vert');
     if (p==='true') return true; if (p==='false') return false;
     return (localStorage.getItem('InkWell:isVertical')==='true') || doc.body.classList.contains('vertical-mode');
   }
+  function getReaderEl(){
+    return doc.getElementById('reader') || doc.querySelector('[data-role="reader"], .reader, main');
+  }
   function getScroller(){
     if (!isVertical()) return doc.scrollingElement || doc.documentElement;
-    const r = doc.getElementById('reader') || doc.querySelector('[data-role="reader"], .reader, main');
-    return r || (doc.scrollingElement || doc.documentElement);
+    return getReaderEl() || (doc.scrollingElement || doc.documentElement);
   }
   function remainingFraction(el){
     if (!el) return 1;
     const total = Math.max(1, el.scrollHeight);
     const seen  = el.scrollTop + el.clientHeight;
-    if (total <= el.clientHeight + 2) return 1; // not scrollable
+    if (total <= el.clientHeight + 2) return 1;
     return Math.max(0, (total - seen) / total);
   }
+  function ensureSentinel(el){
+    if (!el) return null;
+    let s = el.querySelector('#inkwell-end-sentinel');
+    if (!s){ s = doc.createElement('div'); s.id = 'inkwell-end-sentinel'; el.appendChild(s); }
+    else if (s !== el.lastElementChild){ el.appendChild(s); }
+    return s;
+  }
 
-  // Create pill once
+  /* ---------- create pill once ---------- */
   let pill = doc.getElementById('next-pill');
   if (!pill){
     pill = doc.createElement('button');
@@ -2227,90 +2237,59 @@ html.next-pill-active .edge-shield { display: none !important; pointer-events: n
     doc.body.appendChild(pill);
   }
 
-  // Visibility state with hysteresis to avoid flicker
-  const SHOW_REM_FRAC = 0.12;  // show when remaining <= 12%
-  const HIDE_REM_FRAC = 0.18;  // hide when remaining > 18%
-  let visible = false;
-  let scroller = null;
-  let io = null;
-  let ioNear = false;
-  let rafId = null;
+  /* ---------- visibility logic (hardlock) ---------- */
+  const SHOW_FRAC = 0.12, HIDE_FRAC = 0.18;
+  let scroller = null, io = null, ioNear = false, visible = false;
 
-  function applyVisibility(nextVisible){
-    if (nextVisible === visible) return;
-    visible = nextVisible;
-    if (visible) {
-      doc.documentElement.classList.add('next-pill-active');
-    } else {
-      doc.documentElement.classList.remove('next-pill-active');
-    }
+  function forceShow(){
+    // toggle class + inline important
+    doc.documentElement.classList.add('next-pill-active');
+    pill.style.setProperty('display', 'inline-flex', 'important');
+    pill.style.setProperty('opacity', '1', 'important');
+    pill.style.setProperty('pointer-events', 'auto', 'important');
   }
-
+  function forceHide(){
+    doc.documentElement.classList.remove('next-pill-active');
+    pill.style.setProperty('display', 'none', 'important');
+  }
   function computeVisible(){
     const el = scroller || getScroller();
     const rem = remainingFraction(el);
-    // Combined signal: IO near-end OR scroll-fraction near-end (with hysteresis)
-    const wantShow = ioNear || (rem <= SHOW_REM_FRAC);
-    const wantHide = (!ioNear) && (rem > HIDE_REM_FRAC);
-    if (wantShow) applyVisibility(true);
-    else if (wantHide) applyVisibility(false);
-    // Otherwise keep current state (stickiness)
+    const wantShow = ioNear || (rem <= SHOW_FRAC);
+    const wantHide = (!ioNear && rem > HIDE_FRAC);
+    if (wantShow && !visible){ visible = true; forceShow(); log('show (rem=', rem.toFixed(3), 'ioNear=', ioNear, ')'); }
+    else if (wantHide && visible){ visible = false; forceHide(); log('hide (rem=', rem.toFixed(3), 'ioNear=', ioNear, ')'); }
   }
-
-  function onScroll(){
-    if (rafId) cancelAnimationFrame(rafId);
-    rafId = requestAnimationFrame(computeVisible);
-  }
-
-  function ensureSentinel(el){
-    if (!el) return null;
-    let s = el.querySelector('#inkwell-end-sentinel');
-    if (!s){
-      s = doc.createElement('div');
-      s.id = 'inkwell-end-sentinel';
-      el.appendChild(s);
-    } else if (s !== el.lastElementChild){
-      el.appendChild(s); // keep at end
-    }
-    return s;
-  }
+  function onScroll(){ computeVisible(); }
 
   function bindIO(){
-    if (io){ try { io.disconnect(); } catch(e){} io = null; }
+    if (io){ try{ io.disconnect(); }catch(e){} io = null; }
     const el = scroller;
     const s = ensureSentinel(el);
     if (!s) return;
-    io = new IntersectionObserver(entries => {
-      if (entries && entries[0]) {
-        ioNear = entries[0].isIntersecting;
-        computeVisible();
-      }
+    io = new IntersectionObserver(entries=>{
+      ioNear = entries && entries[0] ? entries[0].isIntersecting : false;
+      computeVisible();
     }, {
       root: (el === (doc.scrollingElement || doc.documentElement)) ? null : el,
-      rootMargin: "0px 0px -12% 0px", // near last ~12%
+      rootMargin: '0px 0px -12% 0px',
       threshold: 0
     });
     io.observe(s);
   }
-
   function bind(){
     const el = getScroller();
     if (el !== scroller){
-      if (scroller) scroller.removeEventListener('scroll', onScroll, { passive:true });
+      if (scroller) scroller.removeEventListener('scroll', onScroll, {passive:true});
       scroller = el;
-      if (scroller) scroller.addEventListener('scroll', onScroll, { passive:true });
+      if (scroller) scroller.addEventListener('scroll', onScroll, {passive:true});
       bindIO();
     }
     computeVisible();
   }
 
-  // Click to advance (tap zone first, then fallbacks)
-  function clickRightTapZone(){
-    const rightTap = doc.querySelector('.edge-shield.right, #rightTapZone, [data-role="tap-right"]');
-    if (rightTap){ try { rightTap.click(); return true; } catch(_){} }
-    return false;
-  }
-  function nextFallback(){
+  /* ---------- click behavior (no tap-zone click; direct advance) ---------- */
+  function nextAdvance(){
     const chain = [
       () => window.nextChapter && window.nextChapter(),
       () => window.goToNextChapter && window.goToNextChapter(),
@@ -2319,28 +2298,34 @@ html.next-pill-active .edge-shield { display: none !important; pointer-events: n
       () => window.turnPage && window.turnPage(1),
       () => (typeof window.loadChapter==='function') && window.loadChapter(((window.currentChapterIndex ?? window.chapterIndex ?? (window.ReaderState && typeof ReaderState.getChapterIndex==='function' && ReaderState.getChapterIndex())) || 0) + 1),
     ];
-    for (const fn of chain){ try { const r = fn(); if (r !== undefined) return r; } catch(_){} }
-    try { window.dispatchEvent(new CustomEvent('inkwell:next-chapter')); } catch(_) {}
+    for (const fn of chain){ try { const r = fn(); if (r !== undefined) return r; } catch(e){} }
+    try { window.dispatchEvent(new CustomEvent('inkwell:next-chapter')); } catch(e){}
   }
-  pill.addEventListener('click', () => {
-    // Restore defaults immediately and advance
-    doc.documentElement.classList.remove('next-pill-active');
-    visible = false;
-    if (!clickRightTapZone()) nextFallback();
-    // Recompute after layout settles
-    setTimeout(bind, 80);
+  pill.addEventListener('click', ()=>{
+    forceHide(); // restore defaults immediately
+    nextAdvance();
+    setTimeout(bind, 100);
   });
 
-  // Rebind lifecycle
-  const rebind = () => bind();
+  /* ---------- anti-nuker watchdog ---------- */
+  setInterval(()=>{
+    if (visible){
+      const cs = getComputedStyle(pill);
+      if (cs.display === 'none' || cs.visibility === 'hidden' || cs.opacity === '0'){
+        log('watchdog: restoring pill (overridden by external CSS)');
+        forceShow();
+      }
+    }
+  }, 250);
+
+  /* ---------- lifecycle ---------- */
+  const rebind = ()=>bind();
   doc.addEventListener('DOMContentLoaded', rebind);
   window.addEventListener('resize', rebind);
   window.addEventListener('orientationchange', rebind);
   document.addEventListener('reader:ready', rebind);
   document.addEventListener('chapter:changed', rebind);
   new MutationObserver(()=>rebind()).observe(doc.documentElement, { childList:true, subtree:true });
-
-  // Kick
   bind();
 })();
 </script>
