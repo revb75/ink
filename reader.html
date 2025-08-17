@@ -2151,9 +2151,23 @@ document.addEventListener('error', function (e) {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
 <style>
-/* --- NEXT PILL (force-visible via html.next-pill-active) --- */
-#next-pill {
+/* === Next Pill (robust, sticky, nuke-resistant) === */
+html.next-pill-active body #next-pill {
+  display: inline-flex !important;
+}
+body #next-pill {
   position: fixed;
   top: calc(var(--toolbar-h, 48px) + env(safe-area-inset-top, 0px) + 10px);
   right: calc(env(safe-area-inset-right, 0px) + 12px);
@@ -2166,40 +2180,41 @@ document.addEventListener('error', function (e) {
   box-shadow: 0 6px 18px rgba(0,0,0,.25);
   user-select: none;
   -webkit-tap-highlight-color: transparent;
-  display: none !important;          /* hidden by default */
-  z-index: 10010;
+  display: none !important;
+  z-index: 10050;
 }
-#next-pill:active { transform: translateY(1px); }
+body #next-pill:active { transform: translateY(1px); }
 
-/* Show pill only when html has the toggle class */
-html.next-pill-active #next-pill { display: inline-flex !important; }
-
-/* While pill is active, disable tap zones */
+/* Disable edge shields only while pill visible */
 html.next-pill-active .edge-shield { display: none !important; pointer-events: none !important; }
+
+/* Sentinel for IO detection */
+#inkwell-end-sentinel{width:1px;height:1px;opacity:0;pointer-events:none;}
 </style>
-
-
-
-
-
-
 
 <script>
 (function(){
   'use strict';
   const doc = document;
 
+  // Utilities
   function isVertical(){
     try { if (window.ReaderState && typeof window.ReaderState.getMode==='function') return window.ReaderState.getMode()==='vertical'; } catch(e){}
     const p = new URLSearchParams(location.search).get('vert');
     if (p==='true') return true; if (p==='false') return false;
     return (localStorage.getItem('InkWell:isVertical')==='true') || doc.body.classList.contains('vertical-mode');
   }
-
   function getScroller(){
     if (!isVertical()) return doc.scrollingElement || doc.documentElement;
     const r = doc.getElementById('reader') || doc.querySelector('[data-role="reader"], .reader, main');
     return r || (doc.scrollingElement || doc.documentElement);
+  }
+  function remainingFraction(el){
+    if (!el) return 1;
+    const total = Math.max(1, el.scrollHeight);
+    const seen  = el.scrollTop + el.clientHeight;
+    if (total <= el.clientHeight + 2) return 1; // not scrollable
+    return Math.max(0, (total - seen) / total);
   }
 
   // Create pill once
@@ -2212,7 +2227,41 @@ html.next-pill-active .edge-shield { display: none !important; pointer-events: n
     doc.body.appendChild(pill);
   }
 
-  // Create/ensure an end sentinel inside the scroller
+  // Visibility state with hysteresis to avoid flicker
+  const SHOW_REM_FRAC = 0.12;  // show when remaining <= 12%
+  const HIDE_REM_FRAC = 0.18;  // hide when remaining > 18%
+  let visible = false;
+  let scroller = null;
+  let io = null;
+  let ioNear = false;
+  let rafId = null;
+
+  function applyVisibility(nextVisible){
+    if (nextVisible === visible) return;
+    visible = nextVisible;
+    if (visible) {
+      doc.documentElement.classList.add('next-pill-active');
+    } else {
+      doc.documentElement.classList.remove('next-pill-active');
+    }
+  }
+
+  function computeVisible(){
+    const el = scroller || getScroller();
+    const rem = remainingFraction(el);
+    // Combined signal: IO near-end OR scroll-fraction near-end (with hysteresis)
+    const wantShow = ioNear || (rem <= SHOW_REM_FRAC);
+    const wantHide = (!ioNear) && (rem > HIDE_REM_FRAC);
+    if (wantShow) applyVisibility(true);
+    else if (wantHide) applyVisibility(false);
+    // Otherwise keep current state (stickiness)
+  }
+
+  function onScroll(){
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(computeVisible);
+  }
+
   function ensureSentinel(el){
     if (!el) return null;
     let s = el.querySelector('#inkwell-end-sentinel');
@@ -2220,40 +2269,42 @@ html.next-pill-active .edge-shield { display: none !important; pointer-events: n
       s = doc.createElement('div');
       s.id = 'inkwell-end-sentinel';
       el.appendChild(s);
-    } else {
-      // keep it at the very end
-      if (s !== el.lastElementChild) el.appendChild(s);
+    } else if (s !== el.lastElementChild){
+      el.appendChild(s); // keep at end
     }
     return s;
   }
 
-  function show(){ doc.documentElement.classList.add('next-pill-active'); }
-  function hide(){ doc.documentElement.classList.remove('next-pill-active'); }
-
-  // IO-based near-end detector (more reliable than scroll math)
-  let io = null, scroller = null;
+  function bindIO(){
+    if (io){ try { io.disconnect(); } catch(e){} io = null; }
+    const el = scroller;
+    const s = ensureSentinel(el);
+    if (!s) return;
+    io = new IntersectionObserver(entries => {
+      if (entries && entries[0]) {
+        ioNear = entries[0].isIntersecting;
+        computeVisible();
+      }
+    }, {
+      root: (el === (doc.scrollingElement || doc.documentElement)) ? null : el,
+      rootMargin: "0px 0px -12% 0px", // near last ~12%
+      threshold: 0
+    });
+    io.observe(s);
+  }
 
   function bind(){
     const el = getScroller();
-    if (el === scroller) return;
-    scroller = el;
-    if (io){ try { io.disconnect(); } catch(e){} io = null; }
-    const sentinel = ensureSentinel(scroller);
-    if (!sentinel) return;
-
-    // Root = scroller; rootMargin bottom = -10% to mean "show when last 10% is in view"
-    io = new IntersectionObserver((entries)=>{
-      const e = entries[0];
-      // If sentinel is visible, we are near the bottom -> show
-      if (e && e.isIntersecting) show(); else hide();
-    }, {
-      root: (scroller === (doc.scrollingElement || doc.documentElement)) ? null : scroller,
-      rootMargin: "0px 0px -10% 0px",
-      threshold: 0
-    });
-    io.observe(sentinel);
+    if (el !== scroller){
+      if (scroller) scroller.removeEventListener('scroll', onScroll, { passive:true });
+      scroller = el;
+      if (scroller) scroller.addEventListener('scroll', onScroll, { passive:true });
+      bindIO();
+    }
+    computeVisible();
   }
 
+  // Click to advance (tap zone first, then fallbacks)
   function clickRightTapZone(){
     const rightTap = doc.querySelector('.edge-shield.right, #rightTapZone, [data-role="tap-right"]');
     if (rightTap){ try { rightTap.click(); return true; } catch(_){} }
@@ -2271,22 +2322,23 @@ html.next-pill-active .edge-shield { display: none !important; pointer-events: n
     for (const fn of chain){ try { const r = fn(); if (r !== undefined) return r; } catch(_){} }
     try { window.dispatchEvent(new CustomEvent('inkwell:next-chapter')); } catch(_) {}
   }
-
   pill.addEventListener('click', () => {
-    hide();
+    // Restore defaults immediately and advance
+    doc.documentElement.classList.remove('next-pill-active');
+    visible = false;
     if (!clickRightTapZone()) nextFallback();
-    setTimeout(() => bind(), 100);
+    // Recompute after layout settles
+    setTimeout(bind, 80);
   });
 
-  // Rebind on typical lifecycle changes
-  const rebind = () => { bind(); };
+  // Rebind lifecycle
+  const rebind = () => bind();
   doc.addEventListener('DOMContentLoaded', rebind);
   window.addEventListener('resize', rebind);
   window.addEventListener('orientationchange', rebind);
   document.addEventListener('reader:ready', rebind);
   document.addEventListener('chapter:changed', rebind);
-  // Observe DOM changes since reader loads async
-  new MutationObserver(()=>rebind()).observe(doc.documentElement, { childList: true, subtree: true });
+  new MutationObserver(()=>rebind()).observe(doc.documentElement, { childList:true, subtree:true });
 
   // Kick
   bind();
