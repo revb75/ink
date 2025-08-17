@@ -2181,17 +2181,19 @@ html.next-pill-active .edge-shield { display: none !important; pointer-events: n
 
 
 
+
+
+
 <script>
 (function(){
   'use strict';
   const doc = document;
 
   function isVertical(){
-    try { if (window.ReaderState && typeof window.ReaderState.getMode === 'function') return window.ReaderState.getMode() === 'vertical'; } catch(e){}
+    try { if (window.ReaderState && typeof window.ReaderState.getMode==='function') return window.ReaderState.getMode()==='vertical'; } catch(e){}
     const p = new URLSearchParams(location.search).get('vert');
-    if (p === 'true') return true;
-    if (p === 'false') return false;
-    return (localStorage.getItem('InkWell:isVertical') === 'true') || doc.body.classList.contains('vertical-mode');
+    if (p==='true') return true; if (p==='false') return false;
+    return (localStorage.getItem('InkWell:isVertical')==='true') || doc.body.classList.contains('vertical-mode');
   }
 
   function getScroller(){
@@ -2210,53 +2212,50 @@ html.next-pill-active .edge-shield { display: none !important; pointer-events: n
     doc.body.appendChild(pill);
   }
 
-  // Threshold (last 10%)
-  const THRESHOLD = 0.10;
-  let scroller = null;
-
-  function remainingFraction(el){
-    if (!el) return 1;
-    const total = Math.max(1, el.scrollHeight);
-    const seen = el.scrollTop + el.clientHeight;
-    if (total <= el.clientHeight + 2) return 1; // not scrollable
-    return Math.max(0, (total - seen) / total);
+  // Create/ensure an end sentinel inside the scroller
+  function ensureSentinel(el){
+    if (!el) return null;
+    let s = el.querySelector('#inkwell-end-sentinel');
+    if (!s){
+      s = doc.createElement('div');
+      s.id = 'inkwell-end-sentinel';
+      el.appendChild(s);
+    } else {
+      // keep it at the very end
+      if (s !== el.lastElementChild) el.appendChild(s);
+    }
+    return s;
   }
 
   function show(){ doc.documentElement.classList.add('next-pill-active'); }
   function hide(){ doc.documentElement.classList.remove('next-pill-active'); }
 
-  function onScroll(){
-    const el = scroller || getScroller();
-    const rem = remainingFraction(el);
-    if (isVertical() && rem <= THRESHOLD) show(); else hide();
-  }
+  // IO-based near-end detector (more reliable than scroll math)
+  let io = null, scroller = null;
 
   function bind(){
     const el = getScroller();
-    if (scroller !== el){
-      if (scroller) scroller.removeEventListener('scroll', onScroll, { passive:true });
-      scroller = el;
-      if (scroller) scroller.addEventListener('scroll', onScroll, { passive:true });
-    }
-    onScroll();
+    if (el === scroller) return;
+    scroller = el;
+    if (io){ try { io.disconnect(); } catch(e){} io = null; }
+    const sentinel = ensureSentinel(scroller);
+    if (!sentinel) return;
+
+    // Root = scroller; rootMargin bottom = -10% to mean "show when last 10% is in view"
+    io = new IntersectionObserver((entries)=>{
+      const e = entries[0];
+      // If sentinel is visible, we are near the bottom -> show
+      if (e && e.isIntersecting) show(); else hide();
+    }, {
+      root: (scroller === (doc.scrollingElement || doc.documentElement)) ? null : scroller,
+      rootMargin: "0px 0px -10% 0px",
+      threshold: 0
+    });
+    io.observe(sentinel);
   }
 
-  // Observe size/content changes to re-evaluate threshold
-  let ro;
-  function observeSize(){
-    try {
-      const el = getScroller();
-      if (ro) ro.disconnect();
-      if (window.ResizeObserver && el){
-        ro = new ResizeObserver(onScroll);
-        ro.observe(el);
-      }
-    } catch {}
-  }
-
-  // Click = revert nukes and advance
   function clickRightTapZone(){
-    const rightTap = doc.querySelector('.edge-shield.right, #rightTapZone, [data-role=\"tap-right\"]');
+    const rightTap = doc.querySelector('.edge-shield.right, #rightTapZone, [data-role="tap-right"]');
     if (rightTap){ try { rightTap.click(); return true; } catch(_){} }
     return false;
   }
@@ -2272,23 +2271,25 @@ html.next-pill-active .edge-shield { display: none !important; pointer-events: n
     for (const fn of chain){ try { const r = fn(); if (r !== undefined) return r; } catch(_){} }
     try { window.dispatchEvent(new CustomEvent('inkwell:next-chapter')); } catch(_) {}
   }
+
   pill.addEventListener('click', () => {
-    hide(); // restore defaults immediately
+    hide();
     if (!clickRightTapZone()) nextFallback();
-    setTimeout(() => { bind(); }, 80);
+    setTimeout(() => bind(), 100);
   });
 
-  // Rebind on key lifecycle events
-  doc.addEventListener('DOMContentLoaded', () => { bind(); observeSize(); });
-  window.addEventListener('resize', () => { bind(); observeSize(); });
-  window.addEventListener('orientationchange', () => { bind(); observeSize(); });
-  document.addEventListener('reader:ready', () => { bind(); observeSize(); });
-  document.addEventListener('chapter:changed', () => { bind(); observeSize(); });
-  // Some readers change overflow dynamically; watch for that
-  new MutationObserver(() => { bind(); observeSize(); }).observe(doc.documentElement, { childList:true, subtree:true, attributes:true, attributeFilter:['class','style'] });
+  // Rebind on typical lifecycle changes
+  const rebind = () => { bind(); };
+  doc.addEventListener('DOMContentLoaded', rebind);
+  window.addEventListener('resize', rebind);
+  window.addEventListener('orientationchange', rebind);
+  document.addEventListener('reader:ready', rebind);
+  document.addEventListener('chapter:changed', rebind);
+  // Observe DOM changes since reader loads async
+  new MutationObserver(()=>rebind()).observe(doc.documentElement, { childList: true, subtree: true });
 
   // Kick
-  bind(); observeSize();
+  bind();
 })();
 </script>
 
