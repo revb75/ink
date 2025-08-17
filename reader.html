@@ -71,15 +71,11 @@ html, body {
 #quiet-btn.active { background: rgba(0,0,0,.08); }
 
 /* === OVERRIDE: Remove non-working under-toolbar CTA bar === */
-#next-cta-bar, #next-cta-bar * { display: none !important; }
+/* removed old next-cta-bar styles */
 
 
 /* === OVERRIDE: Move FAB to top-right below toolbar (safe-area aware) === */
-#inkwell-next-fab {
-  top: calc(var(--toolbar-h, 48px) + env(safe-area-inset-top, 0px) + 8px) !important;
-  right: calc(env(safe-area-inset-right, 0px) + 12px) !important;
-  left: auto !important;
-}
+/* removed old inkwell-next-fab styles */
 
 </style>
 <meta charset="utf-8"/>
@@ -2255,107 +2251,64 @@ document.addEventListener('error', function (e) {
 </script>
 
 <!-- Floating Next Chapter Button (appears near end, vertical mode only) -->
+<!-- removed conflicting script -->
+<!-- removed conflicting script -->
+<style>
+/* Clean Next pill (top-right, safe-area aware) */
+#nextFab {
+  position: fixed;
+  top: calc(var(--toolbar-h, 48px) + env(safe-area-inset-top, 0px) + 10px);
+  right: calc(env(safe-area-inset-right, 0px) + 12px);
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(0,0,0,.15);
+  background: #111;
+  color: #fff;
+  font: 600 14px/1 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  box-shadow: 0 6px 18px rgba(0,0,0,.25);
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  display: none;
+  z-index: 10010;
+}
+#nextFab:active { transform: translateY(1px); }
+</style>
+
 <script>
 (function(){
   'use strict';
   const doc = document;
 
-  function getMode(){
-    try { if (window.ReaderState && typeof window.ReaderState.getMode === 'function') return window.ReaderState.getMode(); } catch(e){}
+  function isVertical(){
+    try {
+      if (window.ReaderState && typeof window.ReaderState.getMode === 'function')
+        return window.ReaderState.getMode() === 'vertical';
+    } catch(e){}
     const p = new URLSearchParams(location.search).get('vert');
-    if (p === 'true') return 'vertical';
-    if (p === 'false') return 'horizontal';
-    if (doc.body && doc.body.classList.contains('vertical-mode')) return 'vertical';
-    return (localStorage.getItem('InkWell:isVertical') === 'true') ? 'vertical' : 'horizontal';
+    if (p === 'true') return true;
+    if (p === 'false') return false;
+    return (localStorage.getItem('InkWell:isVertical') === 'true');
   }
 
-  if (getMode() !== 'vertical') return;
+  function getScroller(){
+    if (!isVertical()) return doc.scrollingElement || doc.documentElement;
+    const r = doc.getElementById('reader') || doc.querySelector('[data-role="reader"], .reader, main');
+    return r || (doc.scrollingElement || doc.documentElement);
+  }
 
-  // Create FAB
-  let fab = doc.getElementById('inkwell-next-fab');
+  // Create once
+  let fab = doc.getElementById('nextFab');
   if (!fab){
     fab = doc.createElement('button');
-    fab.id = 'inkwell-next-fab';
+    fab.id = 'nextFab';
+    fab.type = 'button';
     fab.textContent = 'Next';
     doc.body.appendChild(fab);
   }
 
-  // Basic pill styling
-  const style = doc.createElement('style');
-  style.textContent = `#inkwell-next-fab {
-  position: fixed;
-  top: calc(var(--toolbar-h, 48px) + env(safe-area-inset-top, 0px) + 8px);
-  right: calc(env(safe-area-inset-right, 0px) + 12px);
-  left: auto;
-  bottom: auto;
-  z-index: 10000;
-  display: none;
-  padding: 10px 18px;
-  border-radius: 999px;
-  border: 1px solid rgba(0,0,0,.15);
-  background: #111;
-  color: #fff;
-  font: 600 15px/1 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-  box-shadow: 0 6px 18px rgba(0,0,0,.25);
-  -webkit-tap-highlight-color: transparent;
-  user-select: none;
-}
-#inkwell-next-fab.show { display: inline-flex; align-items:center; justify-content:center; }
-#inkwell-next-fab:active { transform: translateY(1px); }`;
-  doc.head.appendChild(style);
-
-  const showFab = () => fab.classList.add('show');
-  const hideFab = () => fab.classList.remove('show');
-
-  function callNextChapter(){
-    // 1) Prefer app's right tap zone to keep logic consistent
-    const rightTap = document.querySelector('.edge-shield.right, #rightTapZone, [data-role="tap-right"]');
-    if (rightTap){ try { rightTap.click(); return; } catch(e){} }
-    // 2) Fire any custom event the app listens to
-    try { window.dispatchEvent(new CustomEvent('inkwell:next-chapter')); } catch(e){}
-    // 3) Known chapter-advance APIs
-    const tries = [
-      () => window.nextChapter && window.nextChapter(),
-      () => window.goToNextChapter && window.goToNextChapter(),
-      () => window.goNext && window.goNext(),
-      () => window.next && window.next(),
-      () => window.turnPage && window.turnPage(1),
-      () => typeof window.loadChapter==='function' && (window.loadChapter((
-           (window.currentChapterIndex ?? window.chapterIndex ?? (window.ReaderState && typeof ReaderState.getChapterIndex==='function' && ReaderState.getChapterIndex()) ?? 0
-      ) + 1)))
-    ];
-    for (const t of tries){ try{ const r=t(); if(r!==undefined) return r; }catch(_){} }
-  }
-    window.dispatchEvent(new CustomEvent('inkwell:next-chapter'));
-  }
-
-  fab.addEventListener('click', callNextChapter);
-
-  // Show FAB when near bottom by percentage (last 10%)
-  const THRESHOLD = 0.10; // show only in last 10% of the chapter
-
-  function getScrollContainer(){
-    // Prefer the app's reader scroller in vertical mode
-    try {
-      if (getMode() === 'vertical') {
-        const r = doc.getElementById('reader') || doc.querySelector('[data-role="reader"], .reader, main');
-        if (r && (getComputedStyle(r).overflowY === 'auto' || getComputedStyle(r).overflowY === 'scroll')) return r;
-      }
-    } catch(e){}
-    // Fallback to document scrolling element
-    return doc.scrollingElement || doc.documentElement;
-  }
-
+  // Show/hide in last 10% of scroller
+  const THRESHOLD = 0.10;
   let scroller = null;
-  function bindScroll(){
-    const el = getScrollContainer();
-    if (el === scroller) return;
-    if (scroller) scroller.removeEventListener('scroll', onScroll, { passive: true });
-    scroller = el;
-    if (!scroller) return;
-    scroller.addEventListener('scroll', onScroll, { passive: true });
-    onScroll();
-  }
 
   function remainingFraction(el){
     const total = Math.max(1, el.scrollHeight);
@@ -2364,81 +2317,57 @@ document.addEventListener('error', function (e) {
   }
 
   function onScroll(){
-    if (getMode() !== 'vertical') { hideFab(); return; }
-    const el = scroller || getScrollContainer();
+    const el = scroller || getScroller();
     const rem = remainingFraction(el);
-    if (rem <= THRESHOLD) showFab(); else hideFab();
+    fab.style.display = (isVertical() && rem <= THRESHOLD) ? 'inline-flex' : 'none';
   }
 
-  // Re-bind when DOM changes size or orientation changes (common on mobile)
-  const rebind = () => { setTimeout(bindScroll, 0); };
-  doc.addEventListener('DOMContentLoaded', rebind);
-  window.addEventListener('resize', rebind);
-  window.addEventListener('orientationchange', rebind);
-  bindScroll();
-
-  window.InkWellNextFab = { show: showFab, hide: hideFab, rearm: bindScroll }; = { show: showFab, hide: hideFab, rearm: onScroll };
-})();
-</script>
-<script>
-(function nextToolbarWire(){
-  const log = (...a) => console.log("[NextToolbar]", ...a);
-
-  // Resolve vertical mode similarly to your app's logic
-  function isVertical(){
-    try {
-      if (window.ReaderState && typeof window.ReaderState.getMode === 'function') {
-        return window.ReaderState.getMode() === 'vertical';
-      }
-    } catch {}
-    const p = new URLSearchParams(location.search).get('vert');
-    if (p === 'true') return true;
-    if (p === 'false') return false;
-    return (localStorage.getItem('InkWell:isVertical') === 'true');
+  function bind(){
+    const el = getScroller();
+    if (scroller === el) return;
+    if (scroller) scroller.removeEventListener('scroll', onScroll, { passive:true });
+    scroller = el;
+    if (scroller) scroller.addEventListener('scroll', onScroll, { passive:true });
+    onScroll();
   }
 
-  function forwardViaTapZone(){
-    const rightTap = document.querySelector('.edge-shield.right, #rightTapZone, [data-role="tap-right"]');
-    if (rightTap) {
-      try { rightTap.click(); return true; } catch(e){}
-    }
+  function clickRightTapZone(){
+    const rightTap = doc.querySelector('.edge-shield.right, #rightTapZone, [data-role="tap-right"]');
+    if (rightTap){ try { rightTap.click(); return true; } catch(_){} }
     return false;
   }
-  function forwardFallback(){
-    if (typeof window.nextPage === 'function') return window.nextPage();
-    if (typeof window.pageForward === 'function') return window.pageForward();
-    if (typeof window.advancePage === 'function') return window.advancePage();
-    if (typeof window.goToNextPage === 'function') return window.goToNextPage();
-    if (typeof window.next === 'function') return window.next();
-    if (typeof window.nextChapter === 'function') return window.nextChapter();
-    if (typeof window.goToNextChapter === 'function') return window.goToNextChapter();
-    if (typeof window.loadChapter === 'function') {
-      const idx = (window.currentChapterIndex ?? window.chap ?? 0) + 1;
-      return window.loadChapter(idx, 'start');
-    }
-    document.dispatchEvent(new CustomEvent('inkwell:next', { bubbles: true }));
-    document.dispatchEvent(new CustomEvent('inkwell:next-chapter', { bubbles: true }));
-    log("Dispatched inkwell:next (+ next-chapter) – no known function found.");
-  }
-  function goForward(){
-    if (!forwardViaTapZone()) forwardFallback();
+
+  function nextFallback(){
+    const chain = [
+      () => window.nextChapter && window.nextChapter(),
+      () => window.goToNextChapter && window.goToNextChapter(),
+      () => window.goNext && window.goNext(),
+      () => window.next && window.next(),
+      () => window.turnPage && window.turnPage(1),
+      () => (typeof window.loadChapter==='function') && window.loadChapter(((window.currentChapterIndex ?? window.chapterIndex ?? (window.ReaderState && typeof ReaderState.getChapterIndex==='function' && ReaderState.getChapterIndex())) || 0) + 1),
+    ];
+    for (const fn of chain){ try { const r = fn(); if (r !== undefined) return r; } catch(_){} }
+    try { window.dispatchEvent(new CustomEvent('inkwell:next-chapter')); } catch(_) {}
   }
 
-  function applyMode(){
-    const v = isVertical();
-    if (v) document.body.classList.add('vertical-mode'); else document.body.classList.remove('vertical-mode');
-    const btn = }
+  fab.addEventListener('click', () => {
+    if (!clickRightTapZone()) nextFallback();
+  });
 
-  if (document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', applyMode, { once:true });
-  } else {
-    applyMode();
-  }
+  // Re-enable tap zones in case any style disabled them
+  doc.querySelectorAll('.edge-shield').forEach(el => {
+    el.style.display = ''; el.style.pointerEvents = '';
+  });
 
-  // Re-arm after chapter changes if your app fires this event
-  document.addEventListener('chapter:changed', applyMode);
+  // Bind lifecycle
+  doc.addEventListener('DOMContentLoaded', bind);
+  window.addEventListener('resize', bind);
+  window.addEventListener('orientationchange', bind);
+  bind();
 })();
-</script></body>
+</script>
+
+</body>
 <script>
 // Dynamically keep --toolbar-h in sync with actual toolbar height (safe for iOS browser chrome changes)
 (function(){
@@ -2540,29 +2469,14 @@ document.addEventListener('error', function (e) {
     -webkit-tap-highlight-color: transparent;
     user-select: none;
   }
-  #inkwell-next-fab.show { display: inline-flex; }
-  #inkwell-next-fab .icon { font-size: 16px; }
-  #inkwell-next-fab .dismiss {
-    font-size: 16px;
-    opacity: .8;
-    padding: 0 2px;
-  }
-  #inkwell-next-fab:active { transform: translateY(1px); }
+  /* removed old inkwell-next-fab styles */
+  /* removed old inkwell-next-fab styles */
+  /* removed old inkwell-next-fab styles */
+  /* removed old inkwell-next-fab styles */
 </style>
 <!-- removed: vertical-mode edge-shield disable to re-enable tap zones --><style>
 /* Next CTA bar directly below toolbar */
-#next-cta-bar {
-  position: sticky;
-  top: 48px;                 /* adjust if your toolbar is taller */
-  z-index: 19;
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 8px 12px;
-  backdrop-filter: blur(6px);
-  background: rgba(17,24,39,.6);
-  border-bottom: 1px solid #1f2937;
-}
+/* removed old next-cta-bar styles */
 /* Professional pill button */
 #next-toolbar-btn {
   appearance: none;
@@ -2578,7 +2492,7 @@ document.addEventListener('error', function (e) {
 }
 #next-toolbar-btn:hover { background:#1e40af; }
 /* Only show CTA bar in vertical mode */
-body:not(.vertical-mode) #next-cta-bar { display: none; }
+body:not(.vertical-mode) /* removed old next-cta-bar styles */
 /* Disable side tap zones in vertical mode so they don't steal clicks */
 body/* tap-zones re-enabled: removed vertical-mode edge-shield override */
 </style></head></html>
