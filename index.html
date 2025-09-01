@@ -1,326 +1,326 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Stoic Journey</title>
-  <meta name="theme-color" content="#0f172a" />
-  <style>
-    :root{
-      --bg:#0b1020; --fg:#e5e7eb; --muted:#9aa4b2; --accent:#7dd3fc; --card:#11162b; --border:#1f2a44;
-      --good:#22c55e; --warn:#f59e0b; --bad:#ef4444;
-      --header-h:56px; --tabbar-h:64px; --radius:16px; --pad:14px; --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-    }
-    @media (prefers-color-scheme: light) {
-      :root{ --bg:#f8fafc; --fg:#0f172a; --muted:#475569; --accent:#0369a1; --card:#ffffff; --border:#e2e8f0; }
-    }
-    [data-theme="light"]:root{ --bg:#f8fafc; --fg:#0f172a; --muted:#475569; --accent:#0369a1; --card:#ffffff; --border:#e2e8f0; }
-    [data-theme="dark"]:root{ --bg:#0b1020; --fg:#e5e7eb; --muted:#9aa4b2; --accent:#7dd3fc; --card:#11162b; --border:#1f2a44; }
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Stoic Journey</title>
+    <meta name="theme-color" content="#0f172a" />
+    <style>
+        :root{
+            --bg:#0b1020; --fg:#e5e7eb; --muted:#9aa4b2; --accent:#7dd3fc; --card:#11162b; --border:#1f2a44;
+            --good:#22c55e; --warn:#f59e0b; --bad:#ef4444;
+            --header-h:56px; --tabbar-h:64px; --radius:16px; --pad:14px; --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+        }
+        @media (prefers-color-scheme: light) {
+            :root{ --bg:#f8fafc; --fg:#0f172a; --muted:#475569; --accent:#0369a1; --card:#ffffff; --border:#e2e8f0; }
+        }
+        [data-theme="light"]:root{ --bg:#f8fafc; --fg:#0f172a; --muted:#475569; --accent:#0369a1; --card:#ffffff; --border:#e2e8f0; }
+        [data-theme="dark"]:root{ --bg:#0b1020; --fg:#e5e7eb; --muted:#9aa4b2; --accent:#7dd3fc; --card:#11162b; --border:#1f2a44; }
 
-    html,body{height:100%;}
-    body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font);
-      -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
-      padding-top:calc(var(--header-h) + env(safe-area-inset-top));
-      padding-bottom:calc(var(--tabbar-h) + env(safe-area-inset-bottom));
-    }
-    *{box-sizing:border-box;}
-    a{color:var(--accent);text-decoration:none}
+        html,body{height:100%;}
+        body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font);
+            -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+            padding-top:calc(var(--header-h) + env(safe-area-inset-top));
+            padding-bottom:calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+        }
+        *{box-sizing:border-box;}
+        a{color:var(--accent);text-decoration:none}
 
-    header.app{
-      position:fixed;top:0;left:0;right:0;height:calc(var(--header-h) + env(safe-area-inset-top));
-      padding-top:env(safe-area-inset-top);display:flex;align-items:center;gap:10px;
-      background:linear-gradient(0deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.06) 100%), var(--bg);
-      border-bottom:1px solid var(--border);z-index:1000;backdrop-filter:saturate(120%) blur(6px);
-    }
-    header.app .title{font-weight:700;font-size:18px;margin-left:12px}
-    header.app .spacer{flex:1}
-    header.app .btn{margin-right:10px}
+        header.app{
+            position:fixed;top:0;left:0;right:0;height:calc(var(--header-h) + env(safe-area-inset-top));
+            padding-top:env(safe-area-inset-top);display:flex;align-items:center;gap:10px;
+            background:linear-gradient(0deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.06) 100%), var(--bg);
+            border-bottom:1px solid var(--border);z-index:1000;backdrop-filter:saturate(120%) blur(6px);
+        }
+        header.app .title{font-weight:700;font-size:18px;margin-left:12px}
+        header.app .spacer{flex:1}
+        header.app .btn{margin-right:10px}
 
-    main{
-      min-height:calc(100svh - var(--header-h) - var(--tabbar-h) - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-      padding:12px; display:block; overflow-x:hidden; overflow-y:auto; scroll-behavior:smooth;
-      overscroll-behavior-y:contain; -webkit-overflow-scrolling:touch;
-    }
-    .view{display:none}
-    .view.active{display:block}
+        main{
+            min-height:calc(100svh - var(--header-h) - var(--tabbar-h) - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+            padding:12px; display:block; overflow-x:hidden; overflow-y:auto; scroll-behavior:smooth;
+            overscroll-behavior-y:contain; -webkit-overflow-scrolling:touch;
+        }
+        .view{display:none}
+        .view.active{display:block}
 
-    .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:var(--pad);
-      box-shadow:0 4px 12px rgba(0,0,0,.08)}
-    .stack{display:grid;gap:12px}
+        .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:var(--pad);
+            box-shadow:0 4px 12px rgba(0,0,0,.08)}
+        .stack{display:grid;gap:12px}
 
-    .btn{appearance:none;border:1px solid var(--border);background:var(--card);color:var(--fg);
-      border-radius:12px;padding:12px 14px;font-weight:600;line-height:1;display:inline-flex;align-items:center;gap:8px;
-      box-shadow:0 1px 0 rgba(255,255,255,.04) inset; cursor:pointer}
-    .btn.primary{background:var(--fg);color:var(--bg);border-color:transparent}
-    .btn.ghost{background:transparent}
-    .btn.full{width:100%;justify-content:center}
+        .btn{appearance:none;border:1px solid var(--border);background:var(--card);color:var(--fg);
+            border-radius:12px;padding:12px 14px;font-weight:600;line-height:1;display:inline-flex;align-items:center;gap:8px;
+            box-shadow:0 1px 0 rgba(255,255,255,.04) inset; cursor:pointer}
+        .btn.primary{background:var(--fg);color:var(--bg);border-color:transparent}
+        .btn.ghost{background:transparent}
+        .btn.full{width:100%;justify-content:center}
 
-    .pill{display:inline-flex;align-items:center;gap:8px;padding:8px 10px;border-radius:999px;border:1px solid var(--border);background:var(--card);font-size:12px;color:var(--muted)}
+        .pill{display:inline-flex;align-items:center;gap:8px;padding:8px 10px;border-radius:999px;border:1px solid var(--border);background:var(--card);font-size:12px;color:var(--muted)}
 
-    .section-title{font-size:14px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
-    .title-lg{font-size:22px;font-weight:800;margin:0 0 4px}
-    .subtitle{color:var(--muted);margin:0 0 8px}
+        .section-title{font-size:14px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+        .title-lg{font-size:22px;font-weight:800;margin:0 0 4px}
+        .subtitle{color:var(--muted);margin:0 0 8px}
 
-    textarea,input,select{width:100%;border:1px solid var(--border);background:var(--bg);color:var(--fg);border-radius:12px;padding:12px;font:inherit}
-    textarea{min-height:96px;resize:vertical}
-    label{font-size:13px;color:var(--muted)}
+        textarea,input,select{width:100%;border:1px solid var(--border);background:var(--bg);color:var(--fg);border-radius:12px;padding:12px;font:inherit}
+        textarea{min-height:96px;resize:vertical}
+        label{font-size:13px;color:var(--muted)}
 
-    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-    @media (max-width:720px){ .grid-2{grid-template-columns:1fr} }
+        .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+        @media (max-width:720px){ .grid-2{grid-template-columns:1fr} }
 
-    .quote{font-size:18px;line-height:1.4}
-    .quote small{display:block;margin-top:6px;color:var(--muted)}
+        .quote{font-size:18px;line-height:1.4}
+        .quote small{display:block;margin-top:6px;color:var(--muted)}
 
-    .meter{display:flex;gap:8px}
-    .meter input[type="range"]{flex:1}
-    .meter .score{width:42px;text-align:center;font-variant-numeric:tabular-nums;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:6px}
+        .meter{display:flex;gap:8px}
+        .meter input[type="range"]{flex:1}
+        .meter .score{width:42px;text-align:center;font-variant-numeric:tabular-nums;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:6px}
 
-    .list{display:grid;gap:8px}
-    .list .row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px;border-radius:12px;border:1px solid var(--border);background:var(--card)}
+        .list{display:grid;gap:8px}
+        .list .row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px;border-radius:12px;border:1px solid var(--border);background:var(--card)}
 
-    .breath{
-      display:grid;place-items:center;border-radius:16px;border:1px dashed var(--border);padding:22px
-    }
-    .breath .circle{width:160px;height:160px;border-radius:999px;border:2px solid var(--accent);display:grid;place-items:center;transition:transform .8s ease}
-    .breath.play .circle{transform:scale(1.08)}
+        .breath{
+            display:grid;place-items:center;border-radius:16px;border:1px dashed var(--border);padding:22px
+        }
+        .breath .circle{width:160px;height:160px;border-radius:999px;border:2px solid var(--accent);display:grid;place-items:center;transition:transform .8s ease}
+        .breath.play .circle{transform:scale(1.08)}
 
-    nav.tabbar{
-      position:fixed;left:0;right:0;bottom:0;height:calc(var(--tabbar-h) + env(safe-area-inset-bottom));
-      padding-bottom:env(safe-area-inset-bottom);background:var(--bg);border-top:1px solid var(--border);z-index:1000;
-      display:grid;grid-template-columns:repeat(var(--tab-count, 5),1fr);align-items:center;gap:0
-    }
-    .tab{display:flex;flex-direction:column;align-items:center;justify-content:center;height:var(--tabbar-h);
-      font-size:11px;color:var(--muted);gap:6px;user-select:none;-webkit-tap-highlight-color:transparent}
-    .tab .ico{font-size:18px}
-    .tab.active{color:var(--fg);font-weight:700}
+        nav.tabbar{
+            position:fixed;left:0;right:0;bottom:0;height:calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+            padding-bottom:env(safe-area-inset-bottom);background:var(--bg);border-top:1px solid var(--border);z-index:1000;
+            display:grid;grid-template-columns:repeat(var(--tab-count, 5),1fr);align-items:center;gap:0
+        }
+        .tab{display:flex;flex-direction:column;align-items:center;justify-content:center;height:var(--tabbar-h);
+            font-size:11px;color:var(--muted);gap:6px;user-select:none;-webkit-tap-highlight-color:transparent}
+        .tab .ico{font-size:18px}
+        .tab.active{color:var(--fg);font-weight:700}
 
-    /* Keyboard-aware tweaks for iOS: hide tabbar while typing */
-    body.kb-open nav.tabbar{transform:translateY(120%)}
+        /* Keyboard-aware tweaks for iOS: hide tabbar while typing */
+        body.kb-open nav.tabbar{transform:translateY(120%)}
 
-    .hint{color:var(--muted);font-size:12px}
-    .danger{color:var(--bad)}
-    .success{color:var(--good)}
-    .center{display:grid;place-items:center}
-  </style>
+        .hint{color:var(--muted);font-size:12px}
+        .danger{color:var(--bad)}
+        .success{color:var(--good)}
+        .center{display:grid;place-items:center}
+    </style>
 </head>
 <body>
-  <header class="app">
+<header class="app">
     <div class="title">🧭 Stoic Journey</div>
     <div class="spacer"></div>
     <button id="btn-theme" class="btn ghost" aria-label="Toggle theme">🌓</button>
-  </header>
+</header>
 
-  <main id="main">
+<main id="main">
 
     <!-- TODAY -->
     <section id="view-today" class="view active">
-      <div class="stack">
-        <div class="card">
-          <div class="pill" id="today-pill">Today • <span id="today-date"></span></div>
-          <h2 class="title-lg" style="margin-top:8px">Quote of the Day</h2>
-          <div class="quote" id="qotd"></div>
-        </div>
-
-        <div class="card">
-          <div class="section-title">Dichotomy of Control</div>
-          <p class="subtitle">Separate what’s up to you from what isn’t. Act on the former, accept the latter.</p>
-          <div class="grid-2">
-            <div>
-              <label>Within my control (Intentions / Actions today)</label>
-              <textarea id="ctl-within" placeholder="e.g., Prepare calmly, speak honestly, show up fully."></textarea>
+        <div class="stack">
+            <div class="card">
+                <div class="pill" id="today-pill">Today • <span id="today-date"></span></div>
+                <h2 class="title-lg" style="margin-top:8px">Quote of the Day</h2>
+                <div class="quote" id="qotd"></div>
             </div>
-            <div>
-              <label>Not in my control (Let it be)</label>
-              <textarea id="ctl-beyond" placeholder="e.g., Others’ opinions, outcomes, weather."></textarea>
-            </div>
-          </div>
-          <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap">
-            <button class="btn" id="btn-clear-ctl">Reset</button>
-            <button class="btn primary" id="btn-save-ctl">Save</button>
-          </div>
-        </div>
 
-        <div class="card">
-          <div class="section-title">Evening Reflection</div>
-          <p class="subtitle">Where did I live according to virtue? Where did I fall short? What can I do tomorrow?</p>
-          <textarea id="evening" placeholder="Write a brief reflection…"></textarea>
-          <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap">
-            <button class="btn" id="btn-evening-clear">Clear</button>
-            <button class="btn primary" id="btn-evening-save">Save</button>
-          </div>
+            <div class="card">
+                <div class="section-title">Dichotomy of Control</div>
+                <p class="subtitle">Separate what’s up to you from what isn’t. Act on the former, accept the latter.</p>
+                <div class="grid-2">
+                    <div>
+                        <label>Within my control (Intentions / Actions today)</label>
+                        <textarea id="ctl-within" placeholder="e.g., Prepare calmly, speak honestly, show up fully."></textarea>
+                    </div>
+                    <div>
+                        <label>Not in my control (Let it be)</label>
+                        <textarea id="ctl-beyond" placeholder="e.g., Others’ opinions, outcomes, weather."></textarea>
+                    </div>
+                </div>
+                <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap">
+                    <button class="btn" id="btn-clear-ctl">Reset</button>
+                    <button class="btn primary" id="btn-save-ctl">Save</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="section-title">Evening Reflection</div>
+                <p class="subtitle">Where did I live according to virtue? Where did I fall short? What can I do tomorrow?</p>
+                <textarea id="evening" placeholder="Write a brief reflection…"></textarea>
+                <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap">
+                    <button class="btn" id="btn-evening-clear">Clear</button>
+                    <button class="btn primary" id="btn-evening-save">Save</button>
+                </div>
+            </div>
         </div>
-      </div>
     </section>
 
     <!-- JOURNAL -->
     <section id="view-journal" class="view">
-      <div class="stack">
-        <div class="card">
-          <div class="section-title">Free Journal</div>
-          <textarea id="journal-new" placeholder="Capture a thought, a lesson, a reminder…"></textarea>
-          <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap">
-            <button class="btn primary" id="btn-journal-add">Add Entry</button>
-          </div>
-        </div>
+        <div class="stack">
+            <div class="card">
+                <div class="section-title">Free Journal</div>
+                <textarea id="journal-new" placeholder="Capture a thought, a lesson, a reminder…"></textarea>
+                <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap">
+                    <button class="btn primary" id="btn-journal-add">Add Entry</button>
+                </div>
+            </div>
 
-        <div class="card">
-          <div class="section-title">Entries</div>
-          <div id="journal-list" class="list" aria-live="polite"></div>
+            <div class="card">
+                <div class="section-title">Entries</div>
+                <div id="journal-list" class="list" aria-live="polite"></div>
+            </div>
         </div>
-      </div>
     </section>
 
     <!-- PRACTICE / EXERCISES -->
     <section id="view-practice" class="view">
-      <div class="stack">
-        <div class="card breath" id="breath">
-          <div>
-            <div class="section-title" style="text-align:center">Box Breathing</div>
-            <p class="subtitle center">4 in • 4 hold • 4 out • 4 hold</p>
-            <div class="circle"><div id="breath-phase">Ready</div></div>
-            <div class="center" style="margin-top:10px">
-              <button class="btn" id="btn-breath">▶︎ Start</button>
+        <div class="stack">
+            <div class="card breath" id="breath">
+                <div>
+                    <div class="section-title" style="text-align:center">Box Breathing</div>
+                    <p class="subtitle center">4 in • 4 hold • 4 out • 4 hold</p>
+                    <div class="circle"><div id="breath-phase">Ready</div></div>
+                    <div class="center" style="margin-top:10px">
+                        <button class="btn" id="btn-breath">▶︎ Start</button>
+                    </div>
+                </div>
             </div>
-          </div>
-        </div>
 
-        <div class="card">
-          <div class="section-title">Premeditatio Malorum</div>
-          <p class="subtitle">Briefly visualize a challenge today. Then list 1–2 wise responses.</p>
-          <textarea id="pm-visual" placeholder="Potential setback…"></textarea>
-          <textarea id="pm-response" placeholder="How I will respond with wisdom…"></textarea>
-          <div style="margin-top:10px">
-            <button class="btn primary" id="btn-pm-save">Save</button>
-          </div>
-        </div>
+            <div class="card">
+                <div class="section-title">Premeditatio Malorum</div>
+                <p class="subtitle">Briefly visualize a challenge today. Then list 1–2 wise responses.</p>
+                <textarea id="pm-visual" placeholder="Potential setback…"></textarea>
+                <textarea id="pm-response" placeholder="How I will respond with wisdom…"></textarea>
+                <div style="margin-top:10px">
+                    <button class="btn primary" id="btn-pm-save">Save</button>
+                </div>
+            </div>
 
-        <div class="card">
-          <div class="section-title">Amor Fati (Love of Fate)</div>
-          <p class="subtitle">Pick a small annoyance and choose to embrace it as training.</p>
-          <input id="amor" placeholder="e.g., Traffic = a chance to practice patience."/>
-          <div style="margin-top:10px"><button class="btn" id="btn-amor-save">Save</button></div>
+            <div class="card">
+                <div class="section-title">Amor Fati (Love of Fate)</div>
+                <p class="subtitle">Pick a small annoyance and choose to embrace it as training.</p>
+                <input id="amor" placeholder="e.g., Traffic = a chance to practice patience."/>
+                <div style="margin-top:10px"><button class="btn" id="btn-amor-save">Save</button></div>
+            </div>
         </div>
-      </div>
     </section>
 
     <!-- TRACKER -->
     <section id="view-tracker" class="view">
-      <div class="stack">
-        <div class="card">
-          <div class="section-title">Virtues (0–5)</div>
-          <div class="meter"><label style="width:110px">Wisdom</label><input type="range" min="0" max="5" step="1" id="v-wisdom"><div class="score" id="s-wisdom">0</div></div>
-          <div class="meter"><label style="width:110px">Courage</label><input type="range" min="0" max="5" step="1" id="v-courage"><div class="score" id="s-courage">0</div></div>
-          <div class="meter"><label style="width:110px">Justice</label><input type="range" min="0" max="5" step="1" id="v-justice"><div class="score" id="s-justice">0</div></div>
-          <div class="meter"><label style="width:110px">Temperance</label><input type="range" min="0" max="5" step="1" id="v-temperance"><div class="score" id="s-temperance">0</div></div>
-          <div class="hint" style="margin-top:6px">Slide to rate today. Auto-saves.</div>
-        </div>
+        <div class="stack">
+            <div class="card">
+                <div class="section-title">Virtues (0–5)</div>
+                <div class="meter"><label style="width:110px">Wisdom</label><input type="range" min="0" max="5" step="1" id="v-wisdom"><div class="score" id="s-wisdom">0</div></div>
+                <div class="meter"><label style="width:110px">Courage</label><input type="range" min="0" max="5" step="1" id="v-courage"><div class="score" id="s-courage">0</div></div>
+                <div class="meter"><label style="width:110px">Justice</label><input type="range" min="0" max="5" step="1" id="v-justice"><div class="score" id="s-justice">0</div></div>
+                <div class="meter"><label style="width:110px">Temperance</label><input type="range" min="0" max="5" step="1" id="v-temperance"><div class="score" id="s-temperance">0</div></div>
+                <div class="hint" style="margin-top:6px">Slide to rate today. Auto-saves.</div>
+            </div>
 
-        <div class="card">
-          <div class="section-title">Streak</div>
-          <div class="list">
-            <div class="row"><div>Active days</div><div id="streak-days" class="pill">0 days</div></div>
-            <div class="row"><div>Last activity</div><div id="streak-last" class="pill">—</div></div>
-          </div>
+            <div class="card">
+                <div class="section-title">Streak</div>
+                <div class="list">
+                    <div class="row"><div>Active days</div><div id="streak-days" class="pill">0 days</div></div>
+                    <div class="row"><div>Last activity</div><div id="streak-last" class="pill">—</div></div>
+                </div>
+            </div>
         </div>
-      </div>
     </section>
 
     <!-- LIBRARY -->
     <section id="view-library" class="view">
-      <div class="stack">
-        <div class="card">
-          <div class="section-title">Quotes</div>
-          <input id="search" placeholder="Filter by text or author…" />
-          <div id="quotes" class="stack" style="margin-top:10px"></div>
+        <div class="stack">
+            <div class="card">
+                <div class="section-title">Quotes</div>
+                <input id="search" placeholder="Filter by text or author…" />
+                <div id="quotes" class="stack" style="margin-top:10px"></div>
+            </div>
         </div>
-      </div>
     </section>
 
     <!-- PROGRAM -->
     <section id="view-program" class="view">
-      <div class="stack">
-        <div class="card">
-          <div class="section-title">21-Day Stoic Program</div>
-          <div class="list">
-            <div class="row"><div>Progress</div><div id="program-progress-pill" class="pill">Day <span id="program-day-pill">1</span> / 21</div></div>
-          </div>
-          <div style="margin-top:10px;height:10px;border-radius:999px;background:var(--border);overflow:hidden">
-            <div id="program-progress-bar" style="height:100%;width:0%"></div>
-          </div>
-        </div>
+        <div class="stack">
+            <div class="card">
+                <div class="section-title">21-Day Stoic Program</div>
+                <div class="list">
+                    <div class="row"><div>Progress</div><div id="program-progress-pill" class="pill">Day <span id="program-day-pill">1</span> / 21</div></div>
+                </div>
+                <div style="margin-top:10px;height:10px;border-radius:999px;background:var(--border);overflow:hidden">
+                    <div id="program-progress-bar" style="height:100%;width:0%"></div>
+                </div>
+            </div>
 
-        <div class="card">
-          <div class="section-title" id="program-theme">Theme</div>
-          <div class="quote" id="program-quote"></div>
-          <p class="subtitle" id="program-adventure"></p>
-          <div class="grid-2">
-            <div>
-              <label>Plan / Setup</label>
-              <textarea id="program-plan" placeholder="How will you do today’s exercise?"></textarea>
+            <div class="card">
+                <div class="section-title" id="program-theme">Theme</div>
+                <div class="quote" id="program-quote"></div>
+                <p class="subtitle" id="program-adventure"></p>
+                <div class="grid-2">
+                    <div>
+                        <label>Plan / Setup</label>
+                        <textarea id="program-plan" placeholder="How will you do today’s exercise?"></textarea>
+                    </div>
+                    <div>
+                        <label>Reflection</label>
+                        <textarea id="program-reflection" placeholder="What did you notice or learn?"></textarea>
+                    </div>
+                </div>
+                <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap">
+                    <button class="btn" id="btn-program-start">Start Program</button>
+                    <button class="btn" id="btn-program-prev">◀︎ Prev</button>
+                    <button class="btn" id="btn-program-next">Next ▶︎</button>
+                    <button class="btn" id="btn-program-save">Save Notes</button>
+                    <button class="btn primary" id="btn-program-complete">Mark Complete</button>
+                </div>
             </div>
-            <div>
-              <label>Reflection</label>
-              <textarea id="program-reflection" placeholder="What did you notice or learn?"></textarea>
-            </div>
-          </div>
-          <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap">
-            <button class="btn" id="btn-program-start">Start Program</button>
-            <button class="btn" id="btn-program-prev">◀︎ Prev</button>
-            <button class="btn" id="btn-program-next">Next ▶︎</button>
-            <button class="btn" id="btn-program-save">Save Notes</button>
-            <button class="btn primary" id="btn-program-complete">Mark Complete</button>
-          </div>
         </div>
-      </div>
     </section>
 
     <!-- SETTINGS -->
     <section id="view-settings" class="view">
-      <div class="stack">
-        <div class="card">
-          <div class="section-title">Theme</div>
-          <div class="list">
-            <div class="row"><div>Appearance</div>
-              <div>
-                <select id="theme-select">
-                  <option value="auto">Auto</option>
-                  <option value="light">Light</option>
-                  <option value="dark">Dark</option>
-                </select>
-              </div>
+        <div class="stack">
+            <div class="card">
+                <div class="section-title">Theme</div>
+                <div class="list">
+                    <div class="row"><div>Appearance</div>
+                        <div>
+                            <select id="theme-select">
+                                <option value="auto">Auto</option>
+                                <option value="light">Light</option>
+                                <option value="dark">Dark</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
             </div>
-          </div>
-        </div>
 
-        <div class="card">
-          <div class="section-title">Data</div>
-          <div class="list">
-            <div class="row"><div>Export JSON</div><button class="btn" id="btn-export">Download</button></div>
-            <div class="row"><div>Import JSON</div><input type="file" id="file-import" accept="application/json"/></div>
-            <div class="row"><div>Reset App</div><button class="btn danger" id="btn-reset">Erase</button></div>
-          </div>
+            <div class="card">
+                <div class="section-title">Data</div>
+                <div class="list">
+                    <div class="row"><div>Export JSON</div><button class="btn" id="btn-export">Download</button></div>
+                    <div class="row"><div>Import JSON</div><input type="file" id="file-import" accept="application/json"/></div>
+                    <div class="row"><div>Reset App</div><button class="btn danger" id="btn-reset">Erase</button></div>
+                </div>
+            </div>
         </div>
-      </div>
     </section>
-  </main>
+</main>
 
-  <nav class="tabbar" role="tablist" style="--tab-count:6">
+<nav class="tabbar" role="tablist" style="--tab-count:6">
     <button class="tab active" data-tab="today" aria-selected="true"><div class="ico">📅</div>Today</button>
     <button class="tab" data-tab="journal"><div class="ico">📝</div>Journal</button>
     <button class="tab" data-tab="practice"><div class="ico">🧪</div>Practice</button>
     <button class="tab" data-tab="tracker"><div class="ico">📈</div>Tracker</button>
     <button class="tab" data-tab="program"><div class="ico">🏁</div>Program</button>
     <button class="tab" data-tab="library"><div class="ico">📚</div>Library</button>
-  </nav>
+</nav>
 
-  <script type="module">
+<script type="module">
     const $ = (sel, el=document) => el.querySelector(sel);
     const $$ = (sel, el=document) => Array.from(el.querySelectorAll(sel));
     const todayStr = () => new Date().toISOString().slice(0,10);
 
     // ---- data store ----
     const KEY = 'stoic:journey:v1';
-    const defaults = { settings:{theme:'auto'}, journal:{entries:{}, free:[]}, ctl:{}, pm:{}, amor:{}, tracker:{daily:{}}, streak:{lastDate:null, count:0}, program:{startedOn:null, currentDay:1, completed:{}, notes:{}} }; 
+    const defaults = { settings:{theme:'auto'}, journal:{entries:{}, free:[]}, ctl:{}, pm:{}, amor:{}, tracker:{daily:{}}, streak:{lastDate:null, count:0}, program:{startedOn:null, currentDay:1, completed:{}, notes:{}} };
     let state = load();
 
     function load(){ try{ return {...structuredClone(defaults), ...JSON.parse(localStorage.getItem(KEY)||'{}')}; }catch{ return structuredClone(defaults); } }
@@ -329,28 +329,28 @@
     // ---- theme ----
     const themeSelect = $('#theme-select');
     function applyTheme(){
-      const t = state.settings.theme || 'auto';
-      document.documentElement.removeAttribute('data-theme');
-      if (t === 'dark') document.documentElement.setAttribute('data-theme','dark');
-      if (t === 'light') document.documentElement.setAttribute('data-theme','light');
-      themeSelect.value = t;
+        const t = state.settings.theme || 'auto';
+        document.documentElement.removeAttribute('data-theme');
+        if (t === 'dark') document.documentElement.setAttribute('data-theme','dark');
+        if (t === 'light') document.documentElement.setAttribute('data-theme','light');
+        themeSelect.value = t;
     }
     $('#btn-theme').addEventListener('click', () => {
-      const order = ['auto','light','dark'];
-      const next = order[(order.indexOf(state.settings.theme||'auto')+1)%order.length];
-      state.settings.theme = next; save(); applyTheme();
+        const order = ['auto','light','dark'];
+        const next = order[(order.indexOf(state.settings.theme||'auto')+1)%order.length];
+        state.settings.theme = next; save(); applyTheme();
     });
     themeSelect.addEventListener('change', e=>{ state.settings.theme = e.target.value; save(); applyTheme(); });
 
     // ---- tabs ----
     $$('.tab').forEach(btn=>btn.addEventListener('click', ()=>openTab(btn.dataset.tab)));
     function openTab(id){
-      $$('.tab').forEach(b=>b.classList.toggle('active', b.dataset.tab===id));
-      $$('.view').forEach(v=>v.classList.toggle('active', v.id===`view-${id}`));
-      if(id==='library') renderQuotes();
-      if(id==='tracker') renderTracker();
-      if(id==='journal') renderJournal();
-      if(id==='program') renderProgram();
+        $$('.tab').forEach(b=>b.classList.toggle('active', b.dataset.tab===id));
+        $$('.view').forEach(v=>v.classList.toggle('active', v.id===`view-${id}`));
+        if(id==='library') renderQuotes();
+        if(id==='tracker') renderTracker();
+        if(id==='journal') renderJournal();
+        if(id==='program') renderProgram();
     }`));
       if(id==='library') renderQuotes();
       if(id==='tracker') renderTracker();
