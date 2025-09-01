@@ -65,75 +65,321 @@
         .section-title{margin:0 0 6px}
         @media (max-width:640px){.grid{grid-template-columns:1fr}.grid>*{grid-column:1/-1 !important}.row.wrap{flex-wrap:wrap}.quote{font-size:17px} header.top .row{flex-wrap:wrap;gap:8px}}
         /* iPad portrait/landscape keep multi-column; no collapse here */
+    
+    nav.tabs .tab {
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:8px 14px;
+      background:transparent;
+      color:var(--muted);
+      font-weight:600;
+      cursor:pointer;
+    }
+    nav.tabs .tab.active {
+      background:var(--accent);
+      color:var(--bg);
+      border-color:var(--accent);
+    }
 
-        nav.tabs .tab {
-            border:1px solid var(--border);
-            border-radius:12px;
-            padding:8px 14px;
-            background:transparent;
-            color:var(--muted);
-            font-weight:600;
-            cursor:pointer;
-        }
-        nav.tabs .tab.active {
-            background:var(--accent);
-            color:var(--bg);
-            border-color:var(--accent);
-        }
+  
+    nav.tabs {
+      display:flex;
+      gap:8px;
+      overflow-x:auto;
+      white-space:nowrap;
+      padding:8px 12px;
+      border-bottom:1px solid var(--border);
+    }
+    nav.tabs .tab {
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:8px 14px;
+      background:transparent;
+      color:var(--muted);
+      font-weight:600;
+      cursor:pointer;
+    }
+    nav.tabs .tab.active {
+      background:var(--accent);
+      color:var(--bg);
+      border-color:var(--accent);
+    }
 
+  
+    nav.tabs {
+      position: sticky;
+      top: var(--header-h);
+      z-index: 999;
+      background: var(--bg);
+    }
 
-        nav.tabs {
-            display:flex;
-            gap:8px;
-            overflow-x:auto;
-            white-space:nowrap;
-            padding:8px 12px;
-            border-bottom:1px solid var(--border);
-        }
-        nav.tabs .tab {
-            border:1px solid var(--border);
-            border-radius:12px;
-            padding:8px 14px;
-            background:transparent;
-            color:var(--muted);
-            font-weight:600;
-            cursor:pointer;
-        }
-        nav.tabs .tab.active {
-            background:var(--accent);
-            color:var(--bg);
-            border-color:var(--accent);
-        }
+      .view{display:none}
+    .view.active{display:block}
+  
+    /* === Modern look refresh === */
+    :root{
+      --radius: 16px;
+      --radius-sm: 12px;
+      --shadow-1: 0 1px 2px rgba(0,0,0,.12), 0 8px 24px rgba(0,0,0,.16);
+      --shadow-2: 0 4px 12px rgba(0,0,0,.18), 0 20px 40px rgba(0,0,0,.24);
+      --ring: 0 0 0 2px var(--accent) inset, 0 0 0 2px var(--accent);
+    }
+    body{
+      font: 15.5px/1.55 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      background:
+        radial-gradient(1200px 600px at 80% -20%, rgba(56,189,248,.12), transparent 60%),
+        radial-gradient(800px 400px at -10% 20%, rgba(34,197,94,.10), transparent 60%),
+        var(--bg);
+      color: var(--fg);
+      letter-spacing:.2px;
+    }
+    header.top{
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      backdrop-filter: saturate(140%) blur(10px);
+      background: linear-gradient(180deg, rgba(2,6,23,.78), rgba(2,6,23,.55));
+      border-bottom: 1px solid var(--border);
+    }
+    .app-title{ font-weight:800; letter-spacing:.3px }
+    .path-pill{ background: rgba(34,197,94,.15); border:1px solid rgba(34,197,94,.35); color:#bbf7d0; }
 
+    /* Tabs */
+    nav.tabs{
+      display:flex; gap:10px; overflow:auto; white-space:nowrap; padding:10px 14px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(15,23,42,.75), rgba(15,23,42,.55));
+      backdrop-filter: saturate(140%) blur(8px);
+    }
+    nav.tabs::-webkit-scrollbar{ display:none }
+    nav.tabs .tab{
+      appearance:none; border:1px solid rgba(148,163,184,.25);
+      background: rgba(17,24,39,.6); color: var(--fg);
+      padding:10px 14px; border-radius:999px; cursor:pointer;
+      font-weight:600; transition: transform .12s ease, border-color .2s ease, background .2s ease;
+    }
+    nav.tabs .tab:hover{ transform: translateY(-1px) }
+    nav.tabs .tab.active, nav.tabs .tab[aria-selected="true"]{
+      border-color: rgba(56,189,248,.65);
+      background: linear-gradient(180deg, rgba(56,189,248,.22), rgba(56,189,248,.10));
+      box-shadow: var(--shadow-1);
+    }
 
-        nav.tabs {
-            position: sticky;
-            top: var(--header-h);
-            z-index: 999;
-            background: var(--bg);
-        }
+    /* Cards */
+    .card{
+      background: linear-gradient(180deg, rgba(17,24,39,.92), rgba(17,24,39,.78));
+      border: 1px solid rgba(148,163,184,.18);
+      border-radius: var(--radius);
+      padding: 16px;
+      box-shadow: var(--shadow-1);
+      transition: transform .12s ease, box-shadow .2s ease;
+    }
+    .card:hover{ transform: translateY(-1px); box-shadow: var(--shadow-2); }
 
-    </style>
+    /* Buttons */
+    .btn{
+      border-radius: var(--radius-sm);
+      border:1px solid rgba(148,163,184,.25);
+      background: rgba(17,24,39,.6);
+      color: var(--fg);
+      padding: 10px 14px;
+      font-weight:700;
+      transition: transform .12s ease, background .2s ease, border-color .2s ease;
+    }
+    .btn:hover{ transform: translateY(-1px) }
+    .btn.primary{
+      background: linear-gradient(180deg, #22c55e, #16a34a);
+      border-color: transparent;
+      color: white;
+    }
+
+    /* Inputs */
+    textarea, input, select{
+      background:#0b1220; border:1px solid rgba(148,163,184,.28); color:var(--fg);
+      border-radius: var(--radius-sm); padding: 10px 12px;
+    }
+    textarea:focus, input:focus, select:focus{ outline: var(--ring); }
+
+    /* Pills & badges */
+    .pill{ border:1px solid rgba(148,163,184,.35); background:rgba(56,189,248,.10); color:#e0f2fe }
+
+    /* Progress bar */
+    .progress-bar{ height:10px; background:#0b1220; border-radius:999px; border:1px solid rgba(148,163,184,.2); overflow:hidden }
+    .progress-bar>div{ height:100%; background:linear-gradient(90deg,#38bdf8,#22c55e) }
+
+    /* View show/hide (safety) */
+    .hidden{ display:none !important }
+
+  
+    /* === Dark Theme Overhaul === */
+    :root {
+      --bg: #05060f;
+      --fg: #f4f6fb;
+      --muted: #9ca3af;
+      --accent: #38bdf8;
+      --card: #111827;
+      --border: #1f2937;
+      --radius: 16px;
+      --radius-sm: 12px;
+      --shadow-1: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.32);
+      --shadow-2: 0 4px 12px rgba(0,0,0,.48), 0 20px 40px rgba(0,0,0,.6);
+      --ring: 0 0 0 2px var(--accent) inset;
+    }
+    body {
+      background: radial-gradient(1200px 600px at 80% -20%, rgba(56,189,248,.08), transparent 60%),
+                  radial-gradient(800px 400px at -10% 20%, rgba(34,197,94,.06), transparent 60%),
+                  linear-gradient(180deg, #0a0b14, #05060f);
+      color: var(--fg);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      font-size: 16px;
+      line-height: 1.6;
+      letter-spacing: 0.2px;
+    }
+    header.top {
+      background: rgba(10, 11, 20, 0.85);
+      backdrop-filter: blur(12px) saturate(150%);
+      border-bottom: 1px solid var(--border);
+    }
+    nav.tabs {
+      background: rgba(15, 23, 42, 0.75);
+      border-bottom: 1px solid var(--border);
+    }
+    nav.tabs .tab {
+      background: rgba(31, 41, 55, 0.7);
+      border: 1px solid rgba(148,163,184,0.25);
+      color: var(--fg);
+    }
+    nav.tabs .tab.active, nav.tabs .tab[aria-selected="true"] {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #000;
+      font-weight: 700;
+    }
+    .card {
+      background: linear-gradient(180deg, rgba(17,24,39,0.95), rgba(17,24,39,0.8));
+      border: 1px solid rgba(148,163,184,0.25);
+      color: var(--fg);
+    }
+    .btn {
+      background: rgba(31, 41, 55, 0.7);
+      color: var(--fg);
+      border: 1px solid rgba(148,163,184,0.25);
+    }
+    .btn.primary {
+      background: linear-gradient(180deg, #38bdf8, #0ea5e9);
+      border-color: transparent;
+      color: #000;
+      font-weight: 700;
+    }
+    textarea, input, select {
+      background: #0a0b14;
+      color: var(--fg);
+      border: 1px solid var(--border);
+    }
+    textarea::placeholder, input::placeholder {
+      color: #6b7280;
+    }
+    .quote { font-size: 18px; line-height: 1.5; }
+    .muted { color: var(--muted); }
+
+  
+    /* === Dark Theme Refresh: high contrast + cool background === */
+    :root{
+      --bg:#070b14;
+      --fg:#e9f0ff;
+      --muted:#a8b3c7;
+      --accent:#7dd3fc;
+      --card:#0e1726;
+      --border:#1b2a3f;
+      --good:#22c55e;
+      --warn:#f59e0b;
+      --bad:#ef4444;
+      --radius:16px;
+    }
+    @media (prefers-color-scheme: dark){
+      :root{ color-scheme: dark; }
+    }
+    html,body{ background-color: var(--bg); color: var(--fg); }
+    body{
+      font: 16.5px/1.6 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; letter-spacing:.2px;
+      /* layered cosmic gradients */
+      background:
+        radial-gradient(1200px 600px at 80% -20%, rgba(56,189,248,.12), transparent 60%),
+        radial-gradient(900px 480px at -10% 30%, rgba(34,197,94,.10), transparent 60%),
+        radial-gradient(800px 400px at 120% 120%, rgba(125,211,252,.08), transparent 60%),
+        linear-gradient(180deg, #070b14, #0a1220 60%, #070b14);
+      position: relative;
+    }
+    /* subtle star specks */
+    body::before{
+      content:""; position:fixed; inset:0; pointer-events:none; z-index:-1;
+      background-image:
+        radial-gradient(rgba(255,255,255,.06) 1px, transparent 1px),
+        radial-gradient(rgba(255,255,255,.05) 1px, transparent 1px);
+      background-size: 3px 3px, 4px 4px;
+      background-position: 0 0, 2px 1px;
+      opacity:.35;
+    }
+    header.top{
+      background: linear-gradient(180deg, rgba(7,11,20,.9), rgba(7,11,20,.6));
+      backdrop-filter: blur(10px) saturate(140%);
+      border-bottom:1px solid var(--border);
+    }
+    .card{
+      background: linear-gradient(180deg, rgba(14,23,38,.95), rgba(14,23,38,.82));
+      border:1px solid rgba(168,179,199,.16);
+      color: var(--fg);
+    }
+    .section-title{ color: var(--muted); letter-spacing:.08em }
+    .subtitle{ color: #c7d3e6 }
+    .quote{ font-size:18.5px; line-height:1.45; }
+    .pill{ background: rgba(125,211,252,.12); border:1px solid rgba(125,211,252,.35); color:#d9f2ff }
+    .btn{ background: rgba(18,26,46,.7); border:1px solid rgba(168,179,199,.28); color: var(--fg) }
+    .btn.primary{ background: linear-gradient(180deg, #22c55e, #16a34a); color:#fff; border-color:transparent }
+    textarea, input, select{ background:#0a1324; border:1px solid rgba(168,179,199,.3); color:var(--fg) }
+    textarea::placeholder, input::placeholder{ color:#9fb0c8 }
+    textarea:focus, input:focus, select:focus{ outline: 2px solid var(--accent); outline-offset:1px }
+    /* tabs */
+    nav.tabs{
+      position: sticky; top: var(--header-h, 56px); z-index: 999;
+      background: linear-gradient(180deg, rgba(7,11,20,.85), rgba(7,11,20,.6));
+      border-bottom:1px solid var(--border);
+    }
+    nav.tabs .tab{ color:#dbe7fb; }
+    nav.tabs .tab.active, nav.tabs .tab[aria-selected="true"]{
+      background: linear-gradient(180deg, rgba(125,211,252,.25), rgba(125,211,252,.12));
+      border-color: rgba(125,211,252,.65);
+      color:#081324;
+      box-shadow: 0 6px 20px rgba(125,211,252,.18);
+    }
+    /* progress bar */
+    .progress-bar{ background:#0a1220; border:1px solid rgba(168,179,199,.22) }
+    .progress-bar>div{ background: linear-gradient(90deg, #60a5fa, #22c55e) }
+    /* ensure contrast for muted text inside cards */
+    .muted{ color: #b7c4da }
+
+  </style>
 </head>
 <body>
 
+
 <header class="top">
-    <div class="row">
-        <div class="row" style="gap:12px">
-            <div class="app-title">🧭 Stoic Journey</div>
-            <div id="pathPill" class="path-pill" role="status" aria-live="polite" title="Your chosen path"></div>
-        </div>
-        <nav class="tabs" role="tablist" aria-label="Primary">
-            <button class="tab active" data-tab="today">Today</button>
-            <button class="tab" data-tab="journal">Journal</button>
-            <button class="tab" data-tab="practice">Practice</button>
-            <button class="tab" data-tab="tracker">Tracker</button>
-            <button class="tab" data-tab="program">Program</button>
-            <button class="tab" data-tab="library">Library</button>
-            <button class="tab" data-tab="settings">Settings</button>
-        </nav>
+  <div class="row">
+    <div class="row" style="gap:12px">
+      <div class="app-title">🧭 Stoic Journey</div>
+      <div id="pathPill" class="path-pill" role="status" aria-live="polite" title="Your chosen path"></div>
     </div>
+    <nav class="tabs" role="tablist" aria-label="Primary">
+      <button class="tab active" role="tab" aria-selected="true" data-tab="today">Today</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="exercises">Exercises</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="progress">Progress</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="library">Library</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="settings">Settings</button>
+    </nav>
+  </div>
 </header>
+
 
 
 <main class="wrap">
@@ -343,6 +589,120 @@
         </div>
     </section>
 
+
+    <section id="tab-journal" class="view">
+      <div class="grid">
+        <article class="card" style="grid-column:span 12">
+          <h2>Free Journal</h2>
+          <textarea id="journal-new" rows="4" placeholder="Capture a thought, lesson, or reminder…"></textarea>
+          <div class="row" style="gap:8px;margin-top:8px">
+            <button class="btn primary" id="btn-journal-add">Add Entry</button>
+          </div>
+        </article>
+        <article class="card" style="grid-column:span 12">
+          <h2>Entries</h2>
+          <div id="journal-list" class="list"></div>
+        </article>
+      </div>
+    </section>
+    
+
+    <section id="tab-practice" class="view">
+      <div class="grid">
+        <article class="card" style="grid-column:span 6">
+          <h2>Box Breathing</h2>
+          <p class="muted">4 in • 4 hold • 4 out • 4 hold</p>
+          <div class="breath" id="breath">
+            <div class="circle"><div id="breath-phase">Ready</div></div>
+            <div class="row center" style="margin-top:8px">
+              <button class="btn" id="btn-breath">▶ Start</button>
+            </div>
+          </div>
+        </article>
+        <article class="card" style="grid-column:span 6">
+          <h2>Premeditatio Malorum</h2>
+          <textarea id="pm-visual" rows="3" placeholder="Potential setback…"></textarea>
+          <textarea id="pm-response" rows="3" placeholder="How I will respond with wisdom…"></textarea>
+          <div style="margin-top:8px"><button class="btn primary" id="btn-pm-save">Save</button></div>
+        </article>
+        <article class="card" style="grid-column:span 6">
+          <h2>Amor Fati</h2>
+          <input id="amor" placeholder="Reframe an annoyance as training"/>
+          <div style="margin-top:8px"><button class="btn" id="btn-amor-save">Save</button></div>
+        </article>
+        <article class="card" style="grid-column:span 6">
+          <h2>Gratitude Trio</h2>
+          <input id="grat1" placeholder="I’m grateful for… #1"/>
+          <input id="grat2" placeholder="… #2" style="margin-top:6px"/>
+          <input id="grat3" placeholder="… #3" style="margin-top:6px"/>
+          <div style="margin-top:8px"><button class="btn" id="btn-grat-save">Save</button></div>
+        </article>
+        <article class="card" style="grid-column:span 12">
+          <h2>Meditation — Brown Noise</h2>
+          <audio id="brown-audio" loop>
+            <source src="https://archive.org/download/noise-ambient/Brown-noise.mp3" type="audio/mpeg">
+          </audio>
+          <div class="row" style="gap:8px;margin-top:8px">
+            <button class="btn primary" id="btn-brown-start">▶ Start 5 min</button>
+            <button class="btn" id="btn-brown-stop">■ Stop</button>
+            <span id="brown-timer" class="pill">5:00</span>
+          </div>
+        </article>
+      </div>
+    </section>
+    
+
+    <section id="tab-tracker" class="view">
+      <div class="grid">
+        <article class="card" style="grid-column:span 12">
+          <h2>Virtues (0–5)</h2>
+          <div class="meter"><label style="width:120px">Wisdom</label><input type="range" min="0" max="5" step="1" id="v-wisdom"><div class="score" id="s-wisdom">0</div></div>
+          <div class="meter"><label style="width:120px">Courage</label><input type="range" min="0" max="5" step="1" id="v-courage"><div class="score" id="s-courage">0</div></div>
+          <div class="meter"><label style="width:120px">Justice</label><input type="range" min="0" max="5" step="1" id="v-justice"><div class="score" id="s-justice">0</div></div>
+          <div class="meter"><label style="width:120px">Temperance</label><input type="range" min="0" max="5" step="1" id="v-temperance"><div class="score" id="s-temperance">0</div></div>
+          <div class="hint" style="margin-top:6px">Slide to rate today. Auto-saves.</div>
+        </article>
+        <article class="card" style="grid-column:span 12">
+          <h2>Streak</h2>
+          <div class="row"><div>Active days</div><div id="streak-days" class="pill">0 days</div></div>
+          <div class="row" style="margin-top:6px"><div>Last activity</div><div id="streak-last" class="pill">—</div></div>
+        </article>
+      </div>
+    </section>
+    
+
+    <section id="tab-program" class="view">
+      <div class="grid">
+        <article class="card" style="grid-column:span 12">
+          <h2>28‑Day Stoic Program</h2>
+          <div class="row"><div>Progress</div><div class="pill">Day <span id="program-day-pill">1</span> / 28</div></div>
+          <div class="progress-bar" style="margin-top:8px"><div id="program-progress-bar" style="width:0%"></div></div>
+        </article>
+        <article class="card" style="grid-column:span 12">
+          <div class="section-title" id="program-theme">Theme</div>
+          <div class="quote" id="program-quote"></div>
+          <p class="subtitle" id="program-adventure"></p>
+          <div class="grid" style="gap:12px">
+            <div class="card" style="grid-column:span 6;background:#0a1222">
+              <h3>Plan / Setup</h3>
+              <textarea id="program-plan" rows="4" placeholder="How will you do today’s exercise?"></textarea>
+            </div>
+            <div class="card" style="grid-column:span 6;background:#0a1222">
+              <h3>Reflection</h3>
+              <textarea id="program-reflection" rows="4" placeholder="What did you notice or learn?"></textarea>
+            </div>
+          </div>
+          <div class="row" style="gap:8px;margin-top:10px;flex-wrap:wrap">
+            <button class="btn" id="btn-program-start">Start Program</button>
+            <button class="btn" id="btn-program-prev">◀ Prev</button>
+            <button class="btn" id="btn-program-next">Next ▶</button>
+            <button class="btn" id="btn-program-save">Save Notes</button>
+            <button class="btn primary" id="btn-program-complete">Mark Complete</button>
+          </div>
+        </article>
+      </div>
+    </section>
+    
 </main>
 
 <template id="lessonItem">
