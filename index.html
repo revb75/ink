@@ -65,7 +65,47 @@
         .section-title{margin:0 0 6px}
         @media (max-width:640px){.grid{grid-template-columns:1fr}.grid>*{grid-column:1/-1 !important}.row.wrap{flex-wrap:wrap}.quote{font-size:17px} header.top .row{flex-wrap:wrap;gap:8px}}
         /* iPad portrait/landscape keep multi-column; no collapse here */
-    </style>
+    
+    nav.tabs .tab {
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:8px 14px;
+      background:transparent;
+      color:var(--muted);
+      font-weight:600;
+      cursor:pointer;
+    }
+    nav.tabs .tab.active {
+      background:var(--accent);
+      color:var(--bg);
+      border-color:var(--accent);
+    }
+
+  
+    nav.tabs {
+      display:flex;
+      gap:8px;
+      overflow-x:auto;
+      white-space:nowrap;
+      padding:8px 12px;
+      border-bottom:1px solid var(--border);
+    }
+    nav.tabs .tab {
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:8px 14px;
+      background:transparent;
+      color:var(--muted);
+      font-weight:600;
+      cursor:pointer;
+    }
+    nav.tabs .tab.active {
+      background:var(--accent);
+      color:var(--bg);
+      border-color:var(--accent);
+    }
+
+  </style>
 </head>
 <body>
 <header class="top">
@@ -80,7 +120,6 @@
             <button class="tab" role="tab" data-tab="progress" aria-selected="false">Progress</button>
             <button class="tab" role="tab" data-tab="library" aria-selected="false">Library</button>
             <button class="tab" role="tab" data-tab="settings" aria-selected="false">Settings</button>
-        </nav> role="tablist" style="display:flex;gap:8px;overflow-x:auto;white-space:nowrap;padding:8px 12px;border-bottom:1px solid var(--border)">
       <button class="tab active" data-tab="today">Today</button>
       <button class="tab" data-tab="journal">Journal</button>
       <button class="tab" data-tab="practice">Practice</button>
