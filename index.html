@@ -105,21 +105,25 @@
       border-color:var(--accent);
     }
 
+  
+    nav.tabs {
+      position: sticky;
+      top: var(--header-h);
+      z-index: 999;
+      background: var(--bg);
+    }
+
   </style>
 </head>
 <body>
+
 <header class="top">
-    <div class="row">
-        <div class="row" style="gap:12px">
-            <div class="app-title">🧭 Stoic Journey</div>
-            <div id="pathPill" class="path-pill" role="status" aria-live="polite" title="Your chosen path"></div>
-        </div>
-        <nav class="tabs" role="tablist" aria-label="Primary">
-            <button class="tab" role="tab" data-tab="today" aria-selected="true">Today</button>
-            <button class="tab" role="tab" data-tab="exercises" aria-selected="false">Exercises</button>
-            <button class="tab" role="tab" data-tab="progress" aria-selected="false">Progress</button>
-            <button class="tab" role="tab" data-tab="library" aria-selected="false">Library</button>
-            <button class="tab" role="tab" data-tab="settings" aria-selected="false">Settings</button>
+  <div class="row">
+    <div class="row" style="gap:12px">
+      <div class="app-title">🧭 Stoic Journey</div>
+      <div id="pathPill" class="path-pill" role="status" aria-live="polite" title="Your chosen path"></div>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Primary">
       <button class="tab active" data-tab="today">Today</button>
       <button class="tab" data-tab="journal">Journal</button>
       <button class="tab" data-tab="practice">Practice</button>
@@ -128,8 +132,9 @@
       <button class="tab" data-tab="library">Library</button>
       <button class="tab" data-tab="settings">Settings</button>
     </nav>
+  </div>
+</header>
 
-  </header>
 
 <main class="wrap">
 
